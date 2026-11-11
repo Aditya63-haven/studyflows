@@ -1,5 +1,7 @@
 import { AppError } from '../../errors';
 import {
+  AICommandInput,
+  AICommandInterpretation,
   AIGeneratedQuestion,
   AINoteInput,
   AIQuizInput,
@@ -12,6 +14,10 @@ interface SummaryResponse {
 
 interface QuizResponse {
   questions?: AIGeneratedQuestion[];
+}
+
+interface CommandResponse {
+  interpretation?: AICommandInterpretation;
 }
 
 /**
@@ -46,6 +52,25 @@ export class ExternalAIProvider implements IAIProvider {
       );
     }
     return response.questions;
+  }
+
+  public async interpretCommand(
+    input: AICommandInput,
+  ): Promise<AICommandInterpretation> {
+    const response = await this.post<CommandResponse>('/interpret-command', input);
+    const interpretation = response.interpretation;
+    if (
+      !interpretation ||
+      typeof interpretation.understood !== 'boolean' ||
+      !interpretation.response
+    ) {
+      throw new AppError(
+        'External AI provider returned an invalid command interpretation',
+        502,
+        false,
+      );
+    }
+    return interpretation;
   }
 
   private async post<T>(path: string, body: unknown): Promise<T> {

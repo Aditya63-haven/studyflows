@@ -1,4 +1,5 @@
 import { QuestionOption, QuestionType } from '../questions/Question';
+import { RescheduleStrategyName } from './IRescheduleStrategy';
 
 export interface AINoteInput {
   title: string;
@@ -24,13 +25,45 @@ export interface AIGeneratedQuestion {
 }
 
 /**
+ * Plan summary passed to the provider when interpreting an assistant command.
+ */
+export interface AICommandPlanSummary {
+  id: string;
+  name: string;
+  examDate: Date;
+  incompleteTopics: number;
+  missedMinutes: number;
+}
+
+export interface AICommandInput {
+  text: string;
+  plans: AICommandPlanSummary[];
+}
+
+export type AICommandAction = 'move-work' | 'none';
+
+/**
+ * Structured understanding of a natural-language study command.
+ */
+export interface AICommandInterpretation {
+  understood: boolean;
+  action: AICommandAction;
+  strategy: RescheduleStrategyName | null;
+  planId: string | null;
+  response: string;
+}
+
+/**
  * Abstraction for AI-backed study features.
  *
- * OOP: Abstraction - note condensation and quiz generation depend only on this interface.
- * OOP: Adapter - concrete providers adapt external or mock backends to this contract.
+ * OOP: Abstraction - note condensation, quiz generation and command parsing
+ * depend only on this interface.
+ * OOP: Adapter - concrete providers adapt external or mock backends to this
+ * contract.
  */
 export interface IAIProvider {
   readonly name: string;
   summarizeNote(input: AINoteInput): Promise<string>;
   generateQuiz(input: AIQuizInput): Promise<AIGeneratedQuestion[]>;
+  interpretCommand(input: AICommandInput): Promise<AICommandInterpretation>;
 }

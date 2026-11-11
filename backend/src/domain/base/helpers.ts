@@ -106,3 +106,46 @@ export const endOfDay = (date: Date): Date => {
 export const uniqueIds = (ids: string[]): string[] => {
   return [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
 };
+
+/**
+ * Local-time YYYY-MM-DD key used to compare calendar days.
+ */
+export const dateKey = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+/**
+ * Monday-based weekday index (Monday = 0 ... Sunday = 6), matching the
+ * availability API.
+ */
+export const weekdayIndex = (date: Date): number => (date.getDay() + 6) % 7;
+
+/**
+ * Parses an "HH:MM" time string into minutes since midnight.
+ */
+export const timeStringToMinutes = (value: string): number => {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+  if (!match) {
+    throw new ValidationError(`Time must be in HH:MM format (received "${value}")`);
+  }
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const total = hours * 60 + minutes;
+  if (hours > 23 || minutes > 59 || total > 1439) {
+    throw new ValidationError(`Time must be a valid clock time (received "${value}")`);
+  }
+  return total;
+};
+
+/**
+ * Formats minutes since midnight as an "HH:MM" time string.
+ */
+export const minutesToTimeString = (minutes: number): string => {
+  const clamped = Math.max(0, Math.min(1439, Math.round(minutes)));
+  const hours = Math.floor(clamped / 60);
+  const remainder = clamped % 60;
+  return `${String(hours).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
+};

@@ -6,13 +6,23 @@ import { Bookmark } from '../domain/entities/Bookmark';
 import { ExamPlan } from '../domain/entities/ExamPlan';
 import { FlashcardDeck } from '../domain/entities/FlashcardDeck';
 import { Note } from '../domain/entities/Note';
+import { Notification } from '../domain/entities/Notification';
 import { Quiz } from '../domain/entities/Quiz';
 import { QuizAttempt } from '../domain/entities/QuizAttempt';
 import { RevisionSchedule } from '../domain/entities/RevisionSchedule';
 import { SharedLink } from '../domain/entities/SharedLink';
+import { StudentAvailability } from '../domain/entities/StudentAvailability';
 import { StudySession } from '../domain/entities/StudySession';
 import { StudySpace } from '../domain/entities/StudySpace';
 import { User } from '../domain/entities/User';
+import { minutesToTimeString } from '../domain/base/helpers';
+import {
+  AppliedChange,
+  AttentionItem,
+  AttentionReport,
+  AttentionSuggestionView,
+} from '../services/AttentionService';
+import { AssistantProposal } from '../services/AssistantService';
 
 /**
  * Converts domain objects into safe, explicit API representations.
@@ -224,6 +234,95 @@ export class Serializer {
       active: link.isActive(),
       publicPath: `/api/public/${link.getItemType() === 'note' ? 'notes' : 'quizzes'}/${link.getToken()}`,
       createdAt: link.getCreatedAt(),
+    };
+  }
+
+  public static availability(availability: StudentAvailability) {
+    return {
+      id: availability.getId(),
+      days: availability.getDays().map((day) => ({
+        weekday: day.getWeekday(),
+        mode: day.getMode(),
+        budgetMinutes: day.getBudgetMinutes(),
+        available: day.isAvailable(),
+        windows: day.getWindows().map((window) => ({
+          id: window.getId(),
+          start: minutesToTimeString(window.getStartMinutes()),
+          end: minutesToTimeString(window.getEndMinutes()),
+        })),
+      })),
+      createdAt: availability.getCreatedAt(),
+      updatedAt: availability.getUpdatedAt(),
+    };
+  }
+
+  public static notification(notification: Notification) {
+    return {
+      id: notification.getId(),
+      type: notification.getType(),
+      title: notification.getTitle(),
+      message: notification.getMessage(),
+      read: notification.isRead(),
+      createdAt: notification.getCreatedAt(),
+    };
+  }
+
+  public static attentionSuggestion(suggestion: AttentionSuggestionView) {
+    return {
+      strategy: suggestion.strategy,
+      label: suggestion.label,
+      description: suggestion.description,
+      targetDate: suggestion.targetDate,
+      minutes: suggestion.minutes,
+    };
+  }
+
+  public static attentionItem(item: AttentionItem) {
+    return {
+      id: item.id,
+      type: item.type,
+      title: item.title,
+      description: item.description,
+      planId: item.planId,
+      planName: item.planName,
+      date: item.date,
+      topicCount: item.topicCount,
+      minutes: item.minutes,
+      suggestions: item.suggestions.map((suggestion) =>
+        Serializer.attentionSuggestion(suggestion),
+      ),
+    };
+  }
+
+  public static attentionReport(report: AttentionReport) {
+    return {
+      generatedAt: report.generatedAt,
+      items: report.items.map((item) => Serializer.attentionItem(item)),
+    };
+  }
+
+  public static appliedChange(applied: AppliedChange) {
+    return {
+      itemId: applied.itemId,
+      strategy: applied.strategy,
+      targetDate: applied.targetDate,
+      minutes: applied.minutes,
+      movedTopicIds: applied.movedTopicIds,
+    };
+  }
+
+  public static assistantProposal(proposal: AssistantProposal) {
+    return {
+      understood: proposal.understood,
+      action: proposal.action,
+      response: proposal.response,
+      planId: proposal.planId,
+      planName: proposal.planName,
+      strategy: proposal.strategy,
+      suggestion: proposal.suggestion
+        ? Serializer.attentionSuggestion(proposal.suggestion)
+        : null,
+      needsConfirmation: proposal.needsConfirmation,
     };
   }
 }

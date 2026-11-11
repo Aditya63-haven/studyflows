@@ -14,6 +14,10 @@ import { createPublicRoutes, createShareRoutes } from './shareRoutes';
 import { createBookmarkRoutes } from './bookmarkRoutes';
 import { createSearchRoutes } from './searchRoutes';
 import { createSessionRoutes } from './studySessionRoutes';
+import { createAvailabilityRoutes } from './availabilityRoutes';
+import { createNotificationRoutes } from './notificationRoutes';
+import { createAttentionRoutes } from './attentionRoutes';
+import { createAssistantRoutes } from './assistantRoutes';
 
 export const createApiRouter = (container: AppContainer): Router => {
   const apiRouter = Router();
@@ -33,6 +37,10 @@ export const createApiRouter = (container: AppContainer): Router => {
   apiRouter.use('/search', createSearchRoutes(container, auth));
   apiRouter.use('/share', createShareRoutes(container, auth));
   apiRouter.use('/public', createPublicRoutes(container));
+  apiRouter.use('/availability', createAvailabilityRoutes(container, auth));
+  apiRouter.use('/notifications', createNotificationRoutes(container, auth));
+  apiRouter.use('/attention', createAttentionRoutes(container, auth));
+  apiRouter.use('/assistant', createAssistantRoutes(container, auth));
 
   return apiRouter;
 };

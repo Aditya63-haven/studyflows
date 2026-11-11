@@ -2,12 +2,14 @@ import { Route, Routes } from 'react-router-dom';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { Layout } from './components/Layout';
 import { AnalyticsPage } from './pages/AnalyticsPage';
+import { AvailabilityPage } from './pages/AvailabilityPage';
 import { BookmarksPage } from './pages/BookmarksPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { DeckEditorPage } from './pages/DeckEditorPage';
 import { ExamPlanDetailPage } from './pages/ExamPlanDetailPage';
 import { ExamPlansPage } from './pages/ExamPlansPage';
 import { FlashcardDeckPage } from './pages/FlashcardDeckPage';
+import { HistoryPage } from './pages/HistoryPage';
 import { LoginPage } from './pages/LoginPage';
 import { NoteEditorPage } from './pages/NoteEditorPage';
 import { NoteViewPage } from './pages/NoteViewPage';
@@ -22,6 +24,7 @@ import { SearchPage } from './pages/SearchPage';
 import { SpaceDetailPage } from './pages/SpaceDetailPage';
 import { SpacesPage } from './pages/SpacesPage';
 import { TakeQuizPage } from './pages/TakeQuizPage';
+import { TasksPage } from './pages/TasksPage';
 
 export const App = () => (
   <Routes>
@@ -46,6 +49,9 @@ export const App = () => (
         <Route path="decks/:deckId" element={<FlashcardDeckPage />} />
         <Route path="decks/:deckId/edit" element={<DeckEditorPage />} />
         <Route path="revision" element={<RevisionPage />} />
+        <Route path="availability" element={<AvailabilityPage />} />
+        <Route path="history" element={<HistoryPage />} />
+        <Route path="tasks" element={<TasksPage />} />
         <Route path="exam-plans" element={<ExamPlansPage />} />
         <Route path="exam-plans/:planId" element={<ExamPlanDetailPage />} />
         <Route path="analytics" element={<AnalyticsPage />} />

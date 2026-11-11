@@ -71,6 +71,13 @@ export class StudyDay {
     return this._topicIds.includes(topicId);
   }
 
+  /**
+   * Topic ids planned for this day that are not completed yet.
+   */
+  public getIncompleteTopicIds(): string[] {
+    return this._topicIds.filter((topicId) => !this._completedTopicIds.includes(topicId));
+  }
+
   public addTopic(topicId: string, estimatedMinutes = 0): boolean {
     const id = requireNonEmpty(topicId, 'topicId');
     if (this._topicIds.includes(id)) {

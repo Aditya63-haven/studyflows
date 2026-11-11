@@ -80,9 +80,11 @@ export const SearchPage = () => {
 
       <form className="search-bar" onSubmit={handleSubmit}>
         <input
+          type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search notes, quizzes and decks..."
+          aria-label="Search your study library"
           autoFocus
         />
         <button className="button" type="submit" disabled={searching}>

@@ -200,6 +200,10 @@ classDiagram
         +addTopic(topic) void
         +addStudyDay(day) void
         +markTopicComplete(topicId, dayId) boolean
+        +getIncompleteTopicIds() List
+        +getMissedWork(now) List
+        +getPendingWork(now) List
+        +moveTopics(fromDayId, targetDate, topicIds) void
         +getProgress() number
         +getDaysRemaining(now) number
     }
@@ -223,8 +227,79 @@ classDiagram
         +StudyDay(props)
         +addTopic(topicId, estimatedMinutes) boolean
         +markTopicComplete(topicId) boolean
+        +getIncompleteTopicIds() List
         +getProgress() number
         +isComplete() boolean
+    }
+
+    class AvailabilityWindow {
+        -String _id
+        -number _startMinutes
+        -number _endMinutes
+        +AvailabilityWindow(props)
+        +getStartMinutes() number
+        +getEndMinutes() number
+        +getDurationMinutes() number
+        +overlaps(other) boolean
+    }
+
+    class DayAvailability {
+        -number _weekday
+        -String _mode
+        -number _budgetMinutes
+        -List _windows
+        -boolean _available
+        +DayAvailability(props)
+        +getWeekday() number
+        +getMode() String
+        +setMode(mode) void
+        +getBudgetMinutes() number
+        +setBudgetMinutes(minutes) void
+        +isAvailable() boolean
+        +setAvailable(available) void
+        +getWindows() List
+        +setWindows(windows) void
+        +addWindow(window) void
+        +removeWindow(windowId) boolean
+        +getWindowMinutes() number
+        +defaultFor(weekday)$ DayAvailability
+    }
+
+    class StudentAvailability {
+        -String _id
+        -String _userId
+        -Map days
+        +StudentAvailability(props)
+        +getUserId() String
+        +getDays() List
+        +getDay(weekday) DayAvailability
+        +setDay(day) void
+        +defaultFor(userId)$ StudentAvailability
+    }
+
+    class CapacityCalculator {
+        +forDay(day)$ DayCapacity
+        +forDate(availability, date)$ DayCapacity
+        +remainingForDate(availability, date, bookedMinutes)$ number
+    }
+
+    class Notification {
+        -String _id
+        -String _userId
+        -String _type
+        -String _title
+        -String _message
+        -boolean _read
+        -String _dedupeKey
+        -Date _createdAt
+        +Notification(props)
+        +getUserId() String
+        +getType() String
+        +getTitle() String
+        +getMessage() String
+        +isRead() boolean
+        +markRead() void
+        +getDedupeKey() String
     }
 
     class RevisionSchedule {
@@ -307,6 +382,12 @@ classDiagram
     Bookmark "0..*" --> "1" StudyItem : references
     User "1" -- "0..*" SharedLink : creates
     SharedLink "0..*" --> "1" StudyItem : exposes
+    User "1" -- "0..1" StudentAvailability : sets
+    StudentAvailability "1" o-- "7" DayAvailability : aggregates per weekday
+    DayAvailability "1" *-- "0..*" AvailabilityWindow : owns
+    User "1" -- "0..*" Notification : receives
+    CapacityCalculator ..> DayAvailability : reads
+    CapacityCalculator ..> StudentAvailability : reads
 ```
 
 ## 2. Patterns and infrastructure
@@ -320,12 +401,14 @@ classDiagram
         +String name
         +summarizeNote(input) Promise
         +generateQuiz(input) Promise
+        +interpretCommand(input) Promise
     }
 
     class MockAIProvider {
         +String name
         +summarizeNote(input) Promise
         +generateQuiz(input) Promise
+        +interpretCommand(input) Promise
     }
 
     class ExternalAIProvider {
@@ -334,6 +417,7 @@ classDiagram
         +String name
         +summarizeNote(input) Promise
         +generateQuiz(input) Promise
+        +interpretCommand(input) Promise
     }
 
     class IRevisionStrategy {
@@ -350,6 +434,25 @@ classDiagram
     class SM2Strategy {
         +String name
         +calculateNextReview(state, rating, now) ReviewResult
+    }
+
+    class IRescheduleStrategy {
+        <<interface>>
+        +String name
+        +String label
+        +propose(request) RescheduleSuggestion
+    }
+
+    class MoveToNextFreeSlotStrategy {
+        +String name
+        +String label
+        +propose(request) RescheduleSuggestion
+    }
+
+    class MoveToWeekendStrategy {
+        +String name
+        +String label
+        +propose(request) RescheduleSuggestion
     }
 
     class IObserver {
@@ -379,6 +482,32 @@ classDiagram
         +review(userId, scheduleId, rating, now) Promise
     }
 
+    class NotificationService {
+        +update(event) Promise
+        +list(userId) Promise
+        +unreadCount(userId) Promise
+        +markRead(userId, notificationId) Promise
+    }
+
+    class AvailabilityService {
+        +getByUser(userId) Promise
+        +saveWeek(userId, days) Promise
+        +saveDay(userId, day) Promise
+    }
+
+    class AttentionService {
+        +publishDetectedEvents(userId) Promise
+        +report(userId) Promise
+        +apply(userId, itemId, strategyName) Promise
+        +applyToPlan(userId, planId, strategyName, now) Promise
+        +previewMove(userId, planId, strategyName, now) Promise
+    }
+
+    class AssistantService {
+        +propose(userId, text, now) Promise
+        +apply(userId, planId, strategy, now) Promise
+    }
+
     class FlashcardService {
         +reviewCard(ownerId, deckId, cardId, rating) Promise
     }
@@ -403,11 +532,13 @@ classDiagram
         -String ownerId
         -Date examDate
         -number dailyStudyHours
+        -StudentAvailability availability
         -List topics
         +setName(name) ExamPlanBuilder
         +setOwnerId(ownerId) ExamPlanBuilder
         +setExamDate(examDate) ExamPlanBuilder
         +setDailyStudyHours(hours) ExamPlanBuilder
+        +setAvailability(availability) ExamPlanBuilder
         +addTopic(topic) ExamPlanBuilder
         +setTopics(topics) ExamPlanBuilder
         +build(now) ExamPlan
@@ -454,6 +585,8 @@ classDiagram
     class StudySessionRepository
     class SharedLinkRepository
     class BookmarkRepository
+    class AvailabilityRepository
+    class NotificationRepository
 
     class Config {
         -Config instance$
@@ -477,8 +610,11 @@ classDiagram
     IAIProvider <|.. ExternalAIProvider
     IRevisionStrategy <|.. SimpleMemoryStrengthStrategy
     IRevisionStrategy <|.. SM2Strategy
+    IRescheduleStrategy <|.. MoveToNextFreeSlotStrategy
+    IRescheduleStrategy <|.. MoveToWeekendStrategy
     IObserver <|.. AnalyticsService
     IObserver <|.. RevisionService
+    IObserver <|.. NotificationService
     IRepository <|.. BaseRepository
     BaseRepository <|-- UserRepository
     BaseRepository <|-- NoteRepository
@@ -491,6 +627,8 @@ classDiagram
     BaseRepository <|-- StudySessionRepository
     BaseRepository <|-- SharedLinkRepository
     BaseRepository <|-- BookmarkRepository
+    BaseRepository <|-- AvailabilityRepository
+    BaseRepository <|-- NotificationRepository
 
     StudyFacade --> IAIProvider : uses
     StudyFacade --> IRevisionStrategy : uses
@@ -503,6 +641,15 @@ classDiagram
     EventBus o-- "0..*" IObserver : notifies
     QuestionFactory ..> Question : instantiates
     ExamPlanService --> ExamPlanBuilder : constructs
+    ExamPlanService --> AvailabilityRepository : reads availability
+    ExamPlanBuilder --> CapacityCalculator : caps daily capacity
+    MoveToNextFreeSlotStrategy ..> CapacityCalculator : computes free minutes
+    MoveToWeekendStrategy ..> CapacityCalculator : computes free minutes
+    AttentionService --> IRescheduleStrategy : resolves suggestions
+    AttentionService --> EventBus : publishes detected events
+    AttentionService --> ExamPlanRepository : saves moved work
+    AssistantService --> IAIProvider : interprets commands
+    AssistantService --> AttentionService : previews and applies moves
     QuizService --> StudyFacade : delegates grading and generation
     NoteService --> StudyFacade : delegates AI work
 ```

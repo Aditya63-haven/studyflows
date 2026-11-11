@@ -1,8 +1,10 @@
 import { ValidationError } from '../../errors';
 import { addDays, startOfDay } from '../../domain/base/helpers';
 import { ExamPlan } from '../../domain/entities/ExamPlan';
+import { StudentAvailability } from '../../domain/entities/StudentAvailability';
 import { StudyDay } from '../../domain/entities/StudyDay';
 import { Topic } from '../../domain/entities/Topic';
+import { CapacityCalculator } from '../../domain/services/CapacityCalculator';
 
 /**
  * Fluent builder for ExamPlan objects.
@@ -10,6 +12,8 @@ import { Topic } from '../../domain/entities/Topic';
  * OOP: Builder - separates the step-by-step plan construction from the final
  * ExamPlan instance.
  * OOP: Composition - the builder creates StudyDays owned by the plan.
+ * OOP: Strategy-like injection - optional StudentAvailability caps each day's
+ * capacity so plans respect the student's real free time.
  */
 export class ExamPlanBuilder {
   private name = '';
@@ -17,6 +21,7 @@ export class ExamPlanBuilder {
   private examDate: Date | null = null;
   private dailyStudyHours = 2;
   private topics: Topic[] = [];
+  private availability: StudentAvailability | null = null;
 
   public setName(name: string): this {
     this.name = name;
@@ -49,6 +54,15 @@ export class ExamPlanBuilder {
   }
 
   /**
+   * Caps each study day at the minutes available on that weekday. Without
+   * availability, the daily study hours define the capacity.
+   */
+  public setAvailability(availability: StudentAvailability): this {
+    this.availability = availability;
+    return this;
+  }
+
+  /**
    * Builds a day-by-day plan from today until the exam date.
    */
   public build(now: Date = new Date()): ExamPlan {
@@ -68,12 +82,18 @@ export class ExamPlanBuilder {
       throw new ValidationError('Exam date cannot be in the past');
     }
 
-    const capacityMinutes = Math.max(1, Math.round(this.dailyStudyHours * 60));
+    const baseCapacityMinutes = Math.max(1, Math.round(this.dailyStudyHours * 60));
     const remaining = [...this.topics];
     const studyDays: StudyDay[] = [];
     let currentDate = new Date(start.getTime());
 
     while (remaining.length > 0 && currentDate.getTime() <= exam.getTime()) {
+      const capacityMinutes = this.capacityForDate(currentDate, baseCapacityMinutes);
+      if (capacityMinutes <= 0) {
+        currentDate = addDays(currentDate, 1);
+        continue;
+      }
+
       const topicIds: string[] = [];
       let plannedMinutes = 0;
 
@@ -123,5 +143,15 @@ export class ExamPlanBuilder {
       topics: this.topics,
       studyDays,
     });
+  }
+
+  private capacityForDate(date: Date, baseCapacityMinutes: number): number {
+    if (!this.availability) {
+      return baseCapacityMinutes;
+    }
+    return Math.min(
+      baseCapacityMinutes,
+      CapacityCalculator.forDate(this.availability, date).totalMinutes,
+    );
   }
 }

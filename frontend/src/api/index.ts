@@ -10,5 +10,8 @@ export { sessionsApi } from './sessions';
 export { bookmarksApi } from './bookmarks';
 export { searchApi } from './search';
 export { sharingApi } from './sharing';
+export { notificationsApi } from './notifications';
+export { attentionApi } from './attention';
+export { assistantApi } from './assistant';
 export { getErrorMessage, TOKEN_STORAGE_KEY } from './client';
 export type * from './types';

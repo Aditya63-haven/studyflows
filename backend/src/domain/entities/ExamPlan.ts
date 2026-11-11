@@ -1,10 +1,12 @@
 import { ValidationError } from '../../errors';
 import {
+  dateKey,
   requireDate,
   requireNonEmpty,
   requireNumberInRange,
   resolveId,
   roundTo,
+  startOfDay,
 } from '../base/helpers';
 import { StudyDay } from './StudyDay';
 import { Topic } from './Topic';
@@ -19,6 +21,13 @@ export interface ExamPlanProps {
   studyDays?: StudyDay[];
   createdAt?: Date;
   updatedAt?: Date;
+}
+
+export interface MissedDayWork {
+  dayId: string;
+  date: Date;
+  topicIds: string[];
+  minutes: number;
 }
 
 /**
@@ -156,6 +165,131 @@ export class ExamPlan {
       this.touch();
     }
     return marked;
+  }
+
+  /**
+   * All topic ids planned on any day that are not completed yet.
+   */
+  public getIncompleteTopicIds(): string[] {
+    const completed = new Set(
+      this._studyDays.flatMap((day) => day.getCompletedTopicIds()),
+    );
+    const planned = this._studyDays.flatMap((day) => day.getTopicIds());
+    return [...new Set(planned.filter((topicId) => !completed.has(topicId)))];
+  }
+
+  /**
+   * Unfinished work on days that are already in the past.
+   */
+  public getMissedWork(now: Date = new Date()): MissedDayWork[] {
+    const cutoff = startOfDay(now);
+    const minutesByTopicId = this.minutesByTopicId();
+
+    return this._studyDays
+      .filter((day) => day.getDate().getTime() < cutoff.getTime())
+      .map((day) => {
+        const topicIds = day.getIncompleteTopicIds();
+        return {
+          dayId: day.getId(),
+          date: day.getDate(),
+          topicIds,
+          minutes: topicIds.reduce(
+            (total, topicId) => total + (minutesByTopicId.get(topicId) ?? 0),
+            0,
+          ),
+        };
+      })
+      .filter((missed) => missed.topicIds.length > 0);
+  }
+
+  /**
+   * Unfinished work on past and current days; falls back to all unfinished
+   * work when nothing is overdue yet.
+   */
+  public getPendingWork(now: Date = new Date()): MissedDayWork[] {
+    const missed = this.getMissedWork(now);
+    const today = this._studyDays.find((day) => dateKey(day.getDate()) === dateKey(now));
+    if (today && today.getIncompleteTopicIds().length > 0) {
+      return [
+        ...missed,
+        {
+          dayId: today.getId(),
+          date: today.getDate(),
+          topicIds: today.getIncompleteTopicIds(),
+          minutes: this.minutesFor(today.getIncompleteTopicIds()),
+        },
+      ];
+    }
+    if (missed.length > 0) {
+      return missed;
+    }
+
+    const remaining = this._studyDays.filter((day) => day.getIncompleteTopicIds().length > 0);
+    if (remaining.length === 0) {
+      return [];
+    }
+
+    return remaining.map((day) => ({
+      dayId: day.getId(),
+      date: day.getDate(),
+      topicIds: day.getIncompleteTopicIds(),
+      minutes: this.minutesFor(day.getIncompleteTopicIds()),
+    }));
+  }
+
+  /**
+   * Moves topics from one study day to another day, creating the target day
+   * when it does not exist yet. Days that become empty are dropped.
+   */
+  public moveTopics(fromDayId: string, targetDate: Date, topicIds: string[]): void {
+    const source = this._studyDays.find((day) => day.getId() === fromDayId);
+    if (!source) {
+      throw new ValidationError('Source study day not found in this exam plan');
+    }
+    if (!(targetDate instanceof Date) || Number.isNaN(targetDate.getTime())) {
+      throw new ValidationError('targetDate must be a valid date');
+    }
+
+    const targetKey = dateKey(requireDate(targetDate, 'targetDate'));
+    const minutesByTopicId = this.minutesByTopicId();
+    const target =
+      this._studyDays.find((day) => dateKey(day.getDate()) === targetKey) ??
+      this.createStudyDay(targetDate);
+
+    for (const topicId of topicIds) {
+      if (!source.containsTopic(topicId) || target.containsTopic(topicId)) {
+        continue;
+      }
+      source.removeTopic(topicId);
+      target.addTopic(topicId, minutesByTopicId.get(topicId) ?? 0);
+    }
+
+    source.setPlannedMinutes(this.minutesFor(source.getTopicIds()));
+    target.setPlannedMinutes(this.minutesFor(target.getTopicIds()));
+
+    if (source.getTopicIds().length === 0) {
+      this._studyDays = this._studyDays.filter((day) => day.getId() !== source.getId());
+    }
+
+    this.touch();
+  }
+
+  private createStudyDay(date: Date): StudyDay {
+    const day = new StudyDay({ date });
+    this._studyDays.push(day);
+    return day;
+  }
+
+  private minutesFor(topicIds: string[]): number {
+    const minutesByTopicId = this.minutesByTopicId();
+    return topicIds.reduce(
+      (total, topicId) => total + (minutesByTopicId.get(topicId) ?? 0),
+      0,
+    );
+  }
+
+  private minutesByTopicId(): Map<string, number> {
+    return new Map(this._topics.map((topic) => [topic.getId(), topic.getEstimatedMinutes()]));
   }
 
   public getProgress(): number {

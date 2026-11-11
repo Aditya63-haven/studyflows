@@ -335,3 +335,65 @@ export interface SessionInput {
   startedAt?: string;
   endedAt?: string | null;
 }
+
+export type NotificationType =
+  | 'quiz.completed'
+  | 'session.missed'
+  | 'exam.approaching'
+  | 'revision.due';
+
+export interface AppNotification {
+  id: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  read: boolean;
+  createdAt: string;
+}
+
+export type RescheduleStrategyName = 'next-free-slot' | 'weekend';
+
+export interface AttentionSuggestion {
+  strategy: RescheduleStrategyName;
+  label: string;
+  description: string;
+  targetDate: string;
+  minutes: number;
+}
+
+export interface AttentionItem {
+  id: string;
+  type: 'missed-session' | 'exam-approaching';
+  title: string;
+  description: string;
+  planId: string;
+  planName: string;
+  date: string | null;
+  topicCount: number;
+  minutes: number;
+  suggestions: AttentionSuggestion[];
+}
+
+export interface AttentionReport {
+  generatedAt: string;
+  items: AttentionItem[];
+}
+
+export interface AppliedChange {
+  itemId: string;
+  strategy: RescheduleStrategyName;
+  targetDate: string;
+  minutes: number;
+  movedTopicIds: string[];
+}
+
+export interface AssistantProposal {
+  understood: boolean;
+  action: 'move-work' | 'none';
+  response: string;
+  planId: string | null;
+  planName: string | null;
+  strategy: RescheduleStrategyName | null;
+  suggestion: AttentionSuggestion | null;
+  needsConfirmation: boolean;
+}

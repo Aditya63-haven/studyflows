@@ -1,9 +1,13 @@
 import {
+  AICommandInput,
+  AICommandInterpretation,
+  AICommandPlanSummary,
   AIGeneratedQuestion,
   AINoteInput,
   AIQuizInput,
   IAIProvider,
 } from '../../domain/interfaces/IAIProvider';
+import { RescheduleStrategyName } from '../../domain/interfaces/IRescheduleStrategy';
 import { QuestionOption } from '../../domain/questions/Question';
 
 const STOP_WORDS = new Set([
@@ -73,6 +77,97 @@ export class MockAIProvider implements IAIProvider {
       : 3;
     const questionCount = Math.min(10, Math.max(1, requested));
     return this.buildQuestions(input).slice(0, questionCount);
+  }
+
+  /**
+   * Deterministic keyword rules: recognizes "move unfinished <subject> work
+   * to the weekend / next free slot" style commands.
+   */
+  public async interpretCommand(
+    input: AICommandInput,
+  ): Promise<AICommandInterpretation> {
+    const text = input.text.toLowerCase();
+    const wantsMove = /(move|shift|reschedul|push|send|put|rearrange)/.test(text);
+    const mentionsWeekend = /(weekend|saturday|sunday)/.test(text);
+    const mentionsNextSlot =
+      /(next|free|slot|earliest|tomorrow|soonest|later|asap|available)/.test(text);
+
+    if (!wantsMove || (!mentionsWeekend && !mentionsNextSlot)) {
+      return {
+        understood: false,
+        action: 'none',
+        strategy: null,
+        planId: null,
+        response:
+          "I can move unfinished work to the weekend or to your next free slot. Try: \"Move unfinished Maths work to the weekend\".",
+      };
+    }
+
+    const strategy: RescheduleStrategyName = mentionsWeekend ? 'weekend' : 'next-free-slot';
+    const plan = MockAIProvider.matchPlan(input.text, input.plans);
+
+    if (!plan) {
+      const planNames = input.plans.map((candidate) => `"${candidate.name}"`).join(', ');
+      return {
+        understood: false,
+        action: 'none',
+        strategy: null,
+        planId: null,
+        response:
+          input.plans.length === 0
+            ? 'You do not have any exam plans to adjust yet.'
+            : `Which plan should I adjust? You have: ${planNames}.`,
+      };
+    }
+
+    return {
+      understood: true,
+      action: 'move-work',
+      strategy,
+      planId: plan.id,
+      response: `Move the unfinished work (${plan.incompleteTopics} topic${
+        plan.incompleteTopics === 1 ? '' : 's'
+      }) from "${plan.name}" to ${
+        strategy === 'weekend' ? 'the weekend' : 'your next free slot'
+      }.`,
+    };
+  }
+
+  private static matchPlan(
+    text: string,
+    plans: AICommandPlanSummary[],
+  ): AICommandPlanSummary | null {
+    if (plans.length === 0) {
+      return null;
+    }
+
+    const words = MockAIProvider.extractKeywords(text);
+    let best: { plan: AICommandPlanSummary; score: number } | null = null;
+
+    for (const plan of plans) {
+      const planTokens = MockAIProvider.extractKeywords(plan.name);
+      let score = 0;
+      for (const word of words) {
+        const stem = word.slice(0, 4);
+        for (const token of planTokens) {
+          if (word === token || token.startsWith(stem) || word.startsWith(token.slice(0, 4))) {
+            score += 1;
+            break;
+          }
+        }
+      }
+      if (score > 0 && (!best || score > best.score)) {
+        best = { plan, score };
+      }
+    }
+
+    if (best) {
+      return best.plan;
+    }
+    if (plans.length === 1) {
+      return plans[0];
+    }
+    return null;
   }
 
   private buildQuestions(input: AIQuizInput): AIGeneratedQuestion[] {

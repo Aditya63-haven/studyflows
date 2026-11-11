@@ -163,6 +163,45 @@ export const createBookmarkSchema = z.object({
   itemType: z.enum(['note', 'quiz', 'flashcarddeck']),
 });
 
+const timeStringSchema = z
+  .string()
+  .trim()
+  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Time must be in HH:MM format');
+
+const availabilityWindowSchema = z.object({
+  id: z.string().trim().min(1).optional(),
+  start: timeStringSchema,
+  end: timeStringSchema,
+});
+
+export const dayAvailabilitySchema = z.object({
+  mode: z.enum(['budget', 'budget-windows']),
+  budgetMinutes: z.number().int().min(0).max(1440),
+  available: z.boolean(),
+  windows: z.array(availabilityWindowSchema).max(10).default([]),
+});
+
+export const saveAvailabilitySchema = z.object({
+  days: z.array(dayAvailabilitySchema).length(7),
+});
+
+export const weekdayParamSchema = z.object({
+  weekday: z.coerce.number().int().min(0).max(6),
+});
+
+export const attentionApplySchema = z.object({
+  strategy: z.enum(['next-free-slot', 'weekend']),
+});
+
+export const assistantCommandSchema = z.object({
+  text: z.string().trim().min(1).max(400),
+});
+
+export const assistantApplySchema = z.object({
+  planId: z.string().trim().min(1),
+  strategy: z.enum(['next-free-slot', 'weekend']),
+});
+
 export const searchQuerySchema = z.object({
   q: z.string().trim().min(1).max(200),
 });

@@ -7,10 +7,14 @@ import { StudyFacade } from './patterns/facade/StudyFacade';
 import { EventBus } from './patterns/observer/EventBus';
 import { SM2Strategy } from './patterns/strategy/SM2Strategy';
 import { SimpleMemoryStrengthStrategy } from './patterns/strategy/SimpleMemoryStrengthStrategy';
+import { MoveToNextFreeSlotStrategy } from './patterns/strategy/MoveToNextFreeSlotStrategy';
+import { MoveToWeekendStrategy } from './patterns/strategy/MoveToWeekendStrategy';
+import { AvailabilityRepository } from './repositories/AvailabilityRepository';
 import { BookmarkRepository } from './repositories/BookmarkRepository';
 import { ExamPlanRepository } from './repositories/ExamPlanRepository';
 import { FlashcardDeckRepository } from './repositories/FlashcardDeckRepository';
 import { NoteRepository } from './repositories/NoteRepository';
+import { NotificationRepository } from './repositories/NotificationRepository';
 import { QuizAttemptRepository } from './repositories/QuizAttemptRepository';
 import { QuizRepository } from './repositories/QuizRepository';
 import { RevisionScheduleRepository } from './repositories/RevisionScheduleRepository';
@@ -19,11 +23,15 @@ import { StudySessionRepository } from './repositories/StudySessionRepository';
 import { StudySpaceRepository } from './repositories/StudySpaceRepository';
 import { UserRepository } from './repositories/UserRepository';
 import { AnalyticsService } from './services/AnalyticsService';
+import { AssistantService } from './services/AssistantService';
+import { AttentionService } from './services/AttentionService';
 import { AuthService } from './services/AuthService';
+import { AvailabilityService } from './services/AvailabilityService';
 import { BookmarkService } from './services/BookmarkService';
 import { ExamPlanService } from './services/ExamPlanService';
 import { FlashcardService } from './services/FlashcardService';
 import { NoteService } from './services/NoteService';
+import { NotificationService } from './services/NotificationService';
 import { QuizService } from './services/QuizService';
 import { RevisionService } from './services/RevisionService';
 import { SearchService } from './services/SearchService';
@@ -41,7 +49,11 @@ export interface AppContainer {
   flashcardService: FlashcardService;
   revisionService: RevisionService;
   examPlanService: ExamPlanService;
+  availabilityService: AvailabilityService;
   analyticsService: AnalyticsService;
+  notificationService: NotificationService;
+  attentionService: AttentionService;
+  assistantService: AssistantService;
   sharingService: SharingService;
   bookmarkService: BookmarkService;
   searchService: SearchService;
@@ -85,6 +97,8 @@ export const createContainer = (): AppContainer => {
   const sessionRepository = new StudySessionRepository();
   const sharedLinkRepository = new SharedLinkRepository();
   const bookmarkRepository = new BookmarkRepository();
+  const availabilityRepository = new AvailabilityRepository();
+  const notificationRepository = new NotificationRepository();
 
   const revisionStrategy = createRevisionStrategy(config);
   const eventBus = new EventBus();
@@ -95,12 +109,32 @@ export const createContainer = (): AppContainer => {
     quizRepository,
   );
   const revisionService = new RevisionService(revisionRepository, revisionStrategy);
+  const notificationService = new NotificationService(notificationRepository);
+  const availabilityService = new AvailabilityService(availabilityRepository);
+
+  const rescheduleStrategies = {
+    'next-free-slot': new MoveToNextFreeSlotStrategy(),
+    weekend: new MoveToWeekendStrategy(),
+  };
+
+  const attentionService = new AttentionService(
+    examPlanRepository,
+    revisionRepository,
+    availabilityRepository,
+    rescheduleStrategies,
+    eventBus,
+  );
 
   eventBus.subscribe('quiz.completed', analyticsService);
   eventBus.subscribe('quiz.completed', revisionService);
+  eventBus.subscribe('quiz.completed', notificationService);
+  eventBus.subscribe('session.missed', notificationService);
+  eventBus.subscribe('exam.approaching', notificationService);
+  eventBus.subscribe('revision.due', notificationService);
 
+  const aiProvider = createAIProvider(config);
   const studyFacade = new StudyFacade({
-    aiProvider: createAIProvider(config),
+    aiProvider,
     revisionStrategy,
     eventBus,
   });
@@ -129,8 +163,16 @@ export const createContainer = (): AppContainer => {
       revisionStrategy,
     ),
     revisionService,
-    examPlanService: new ExamPlanService(examPlanRepository),
+    examPlanService: new ExamPlanService(examPlanRepository, availabilityRepository),
+    availabilityService,
     analyticsService,
+    notificationService,
+    attentionService,
+    assistantService: new AssistantService(
+      aiProvider,
+      examPlanRepository,
+      attentionService,
+    ),
     sharingService: new SharingService(
       sharedLinkRepository,
       noteRepository,

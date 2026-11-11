@@ -70,6 +70,7 @@ Studyflows/
 - [Class diagram](docs/class-diagram.md)
 - [Sequence: take a quiz](docs/sequence-take-quiz.md)
 - [Sequence: generate a quiz from a note](docs/sequence-generate-quiz-from-note.md)
+- [Sequence: missed session to adjustment](docs/sequence-attention-adjustment.md)
 - [Activity: exam plan](docs/activity-exam-plan.md)
 - [Activity: revision mode](docs/activity-revision.md)
 - [SOLID principles with code examples](docs/SOLID.md)
@@ -257,6 +258,20 @@ Authorization: Bearer <token>
 | GET    | `/sessions`                                | List study sessions        |
 | POST   | `/sessions`                                | Record a study session     |
 
+### Availability, notifications, attention and assistant
+
+| Method | Endpoint                       | Description                                        |
+| ------ | ------------------------------ | -------------------------------------------------- |
+| GET    | `/availability`                | Get the weekly study availability                  |
+| PUT    | `/availability`                | Save the whole week (one day per weekday)          |
+| PUT    | `/availability/:weekday`       | Save one weekday (0 = Monday ... 6 = Sunday)       |
+| GET    | `/notifications`                | List notifications with the unread count          |
+| PATCH  | `/notifications/:id/read`      | Mark a notification as read                       |
+| GET    | `/attention`                   | Missed sessions and approaching exams with fixes  |
+| POST   | `/attention/:itemId/apply`     | Apply a reschedule suggestion (`next-free-slot` or `weekend`) |
+| POST   | `/assistant/command`           | Interpret a natural-language planning command     |
+| POST   | `/assistant/apply`             | Confirm and apply a proposed move of study work    |
+
 ### Bookmarks, search and sharing
 
 | Method | Endpoint                          | Description                         |
@@ -280,8 +295,8 @@ Key OOP examples include:
 
 - `StudyItem` as an abstract base for notes, quizzes and flashcard decks.
 - `Question` as an abstract base for MCQ, multi-select and true/false questions, each overriding `evaluate()`.
-- `IGradable`, `IAIProvider`, `IRepository`, `IRevisionStrategy`, `IShareable` and `IObserver` as focused interfaces.
+- `IGradable`, `IAIProvider`, `IRepository`, `IRevisionStrategy`, `IRescheduleStrategy`, `IShareable` and `IObserver` as focused interfaces.
 - Private fields and validated getters/setters for encapsulation.
-- Association, aggregation and composition relationships between users, spaces, items, questions, decks and exam plans.
-- `QuestionFactory`, `SimpleMemoryStrengthStrategy`, `SM2Strategy`, `EventBus`, repositories, `Config`, `Database`, `ExamPlanBuilder`, AI adapters and `StudyFacade` as design-pattern examples.
+- Association, aggregation and composition relationships between users, spaces, items, questions, decks, exam plans and weekly availability.
+- `QuestionFactory`, `SimpleMemoryStrengthStrategy`, `SM2Strategy`, `MoveToNextFreeSlotStrategy`, `MoveToWeekendStrategy`, `EventBus`, repositories, `Config`, `Database`, `ExamPlanBuilder`, AI adapters and `StudyFacade` as design-pattern examples.
 - An `AppError` hierarchy with central Express error middleware and consistent JSON errors.

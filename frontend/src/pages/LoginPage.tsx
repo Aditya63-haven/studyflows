@@ -36,7 +36,9 @@ export const LoginPage = () => {
     <div className="auth-shell">
       <div className="auth-card">
         <div className="auth-brand">
-          <span className="brand-mark">SF</span>
+          <span className="logo-badge" aria-hidden="true">
+            S
+          </span>
           <div>
             <h1>Welcome back</h1>
             <p className="muted">Pick up where your revision left off.</p>

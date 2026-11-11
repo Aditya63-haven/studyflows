@@ -35,7 +35,9 @@ export const RegisterPage = () => {
     <div className="auth-shell">
       <div className="auth-card">
         <div className="auth-brand">
-          <span className="brand-mark">SF</span>
+          <span className="logo-badge" aria-hidden="true">
+            S
+          </span>
           <div>
             <h1>Create your account</h1>
             <p className="muted">Build notes, quizzes and a revision routine.</p>

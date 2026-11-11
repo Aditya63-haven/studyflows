@@ -1,22 +1,20 @@
 import { Link } from 'react-router-dom';
 import type { ReactNode } from 'react';
+import { Chip } from './Chip';
 
 export const PublicShell = ({ children }: { children: ReactNode }) => (
-  <div className="app-shell">
-    <header className="navbar">
-      <div className="navbar-inner">
-        <Link to="/" className="brand">
-          <span className="brand-mark">SF</span>
-          <span>StudyFlows</span>
+  <div className="public-shell">
+    <div className="public-card">
+      <header className="public-brand">
+        <Link to="/" className="wordmark">
+          <span className="logo-badge" aria-hidden="true">
+            S
+          </span>
+          StudyFlows
         </Link>
-        <div className="user-menu">
-          <span className="badge">Shared view</span>
-          <Link className="button small" to="/login">
-            Log in
-          </Link>
-        </div>
-      </div>
-    </header>
-    <main className="container">{children}</main>
+        <Chip>Shared view</Chip>
+      </header>
+      {children}
+    </div>
   </div>
 );

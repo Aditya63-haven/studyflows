@@ -12,7 +12,7 @@ const emptyForm = {
   name: '',
   subject: '',
   description: '',
-  color: '#6366f1',
+  color: '#b2d8c6',
 };
 
 export const SpacesPage = () => {

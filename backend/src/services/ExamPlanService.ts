@@ -2,6 +2,7 @@ import { ForbiddenError, NotFoundError, ValidationError } from '../errors';
 import { ExamPlan } from '../domain/entities/ExamPlan';
 import { Topic } from '../domain/entities/Topic';
 import { ExamPlanBuilder } from '../patterns/builder/ExamPlanBuilder';
+import { AvailabilityRepository } from '../repositories/AvailabilityRepository';
 import { ExamPlanRepository } from '../repositories/ExamPlanRepository';
 
 export interface ExamTopicInput {
@@ -28,9 +29,13 @@ export interface UpdateExamPlanInput {
  *
  * OOP: Builder - ExamPlanBuilder constructs the day-by-day schedule.
  * OOP: Composition - StudyDays are replaced when the plan is rescheduled.
+ * OOP: DIP - planning respects availability through an injected repository.
  */
 export class ExamPlanService {
-  constructor(private readonly planRepository: ExamPlanRepository) {}
+  constructor(
+    private readonly planRepository: ExamPlanRepository,
+    private readonly availabilityRepository: AvailabilityRepository,
+  ) {}
 
   public list(ownerId: string): Promise<ExamPlan[]> {
     return this.planRepository.findByOwner(ownerId);
@@ -46,6 +51,11 @@ export class ExamPlanService {
       .setName(input.name)
       .setExamDate(input.examDate)
       .setDailyStudyHours(input.dailyStudyHours);
+
+    const availability = await this.availabilityRepository.findByOwner(ownerId);
+    if (availability) {
+      builder.setAvailability(availability);
+    }
 
     for (const topic of input.topics) {
       builder.addTopic(
@@ -84,13 +94,19 @@ export class ExamPlanService {
       const completedTopicIds = new Set(
         plan.getStudyDays().flatMap((day) => day.getCompletedTopicIds()),
       );
-      const rebuilt = new ExamPlanBuilder()
+      const builder = new ExamPlanBuilder()
         .setOwnerId(plan.getOwnerId())
         .setName(input.name ?? plan.getName())
         .setExamDate(input.examDate ?? plan.getExamDate())
         .setDailyStudyHours(input.dailyStudyHours ?? plan.getDailyStudyHours())
-        .setTopics(plan.getTopics())
-        .build();
+        .setTopics(plan.getTopics());
+
+      const availability = await this.availabilityRepository.findByOwner(plan.getOwnerId());
+      if (availability) {
+        builder.setAvailability(availability);
+      }
+
+      const rebuilt = builder.build();
 
       const updated = new ExamPlan({
         id: plan.getId(),
