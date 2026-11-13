@@ -2,11 +2,10 @@ import axios from 'axios';
 
 export const TOKEN_STORAGE_KEY = 'studyflows.token';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api';
+
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL ?? '/api',
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  baseURL: API_BASE_URL,
 });
 
 apiClient.interceptors.request.use((config) => {
@@ -16,6 +15,29 @@ apiClient.interceptors.request.use((config) => {
   }
   return config;
 });
+
+let unauthorizedHandler: (() => void) | null = null;
+
+export const setUnauthorizedHandler = (handler: (() => void) | null): void => {
+  unauthorizedHandler = handler;
+};
+
+const isAuthFreePath = (url: string): boolean =>
+  url.startsWith('/auth/login') || url.startsWith('/auth/register') || url.startsWith('/public/');
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error: unknown) => {
+    if (
+      axios.isAxiosError(error) &&
+      error.response?.status === 401 &&
+      !isAuthFreePath(error.config?.url ?? '')
+    ) {
+      unauthorizedHandler?.();
+    }
+    return Promise.reject(error);
+  },
+);
 
 export interface ApiErrorPayload {
   error?: {
@@ -42,6 +64,19 @@ export const getErrorMessage = (error: unknown): string => {
   }
 
   return 'Something went wrong.';
+};
+
+export const resolveApiAssetUrl = (assetUrl: string | null | undefined): string | null => {
+  if (!assetUrl) {
+    return null;
+  }
+  if (/^[a-z][a-z\d+.-]*:/i.test(assetUrl)) {
+    return assetUrl;
+  }
+  if (/^https?:\/\//i.test(API_BASE_URL)) {
+    return new URL(assetUrl, API_BASE_URL).toString();
+  }
+  return assetUrl;
 };
 
 export default apiClient;

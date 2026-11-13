@@ -2,6 +2,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  avatarUrl: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -337,10 +338,7 @@ export interface SessionInput {
 }
 
 export type NotificationType =
-  | 'quiz.completed'
-  | 'session.missed'
-  | 'exam.approaching'
-  | 'revision.due';
+  'quiz.completed' | 'session.missed' | 'exam.approaching' | 'revision.due';
 
 export interface AppNotification {
   id: string;

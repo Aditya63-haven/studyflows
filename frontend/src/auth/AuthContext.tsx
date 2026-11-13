@@ -8,6 +8,8 @@ import {
   type ReactNode,
 } from 'react';
 import { authApi, AuthResponse, TOKEN_STORAGE_KEY, User } from '../api';
+import type { UpdateProfileInput, UploadProgressHandler } from '../api/auth';
+import { setUnauthorizedHandler } from '../api/client';
 
 interface AuthContextValue {
   user: User | null;
@@ -15,6 +17,9 @@ interface AuthContextValue {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
+  updateProfile: (input: UpdateProfileInput) => Promise<User>;
+  uploadAvatar: (file: File, onProgress?: UploadProgressHandler) => Promise<User>;
+  removeAvatar: () => Promise<User>;
   logout: () => void;
 }
 
@@ -44,6 +49,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setToken(null);
     setUser(null);
   }, []);
+
+  useEffect(() => {
+    setUnauthorizedHandler(logout);
+    return () => setUnauthorizedHandler(null);
+  }, [logout]);
 
   useEffect(() => {
     if (!token) {
@@ -92,9 +102,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     [applySession],
   );
 
+  const updateProfile = useCallback(async (input: UpdateProfileInput) => {
+    const updated = await authApi.updateProfile(input);
+    setUser(updated);
+    return updated;
+  }, []);
+
+  const uploadAvatar = useCallback(async (file: File, onProgress?: UploadProgressHandler) => {
+    const updated = await authApi.uploadAvatar(file, onProgress);
+    setUser(updated);
+    return updated;
+  }, []);
+
+  const removeAvatar = useCallback(async () => {
+    const updated = await authApi.removeAvatar();
+    setUser(updated);
+    return updated;
+  }, []);
+
   const value = useMemo(
-    () => ({ user, token, loading, login, register, logout }),
-    [user, token, loading, login, register, logout],
+    () => ({
+      user,
+      token,
+      loading,
+      login,
+      register,
+      updateProfile,
+      uploadAvatar,
+      removeAvatar,
+      logout,
+    }),
+    [user, token, loading, login, register, updateProfile, uploadAvatar, removeAvatar, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

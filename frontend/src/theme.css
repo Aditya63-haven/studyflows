@@ -1,0 +1,57 @@
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f4f7f5;
+  --surface: #ffffff;
+  --surface-2: #eef3f0;
+  --border: #d5dfd9;
+  --text: #18231e;
+  --muted: #5e6f66;
+  --accent: #2e7d5d;
+  --accent-text: #ffffff;
+  --accent-soft: #e2f1ea;
+  --warn-bg: #fff4da;
+  --warn-border: #d8a735;
+  --warn-text: #765307;
+  --danger: #b64d38;
+  --danger-soft: #fbe8e3;
+  --danger-text: #913725;
+  --info-soft: #e8edf0;
+}
+
+:root[data-theme='light'] .button:hover,
+:root[data-theme='light'] .button.success:hover {
+  background: #276d51;
+}
+
+:root[data-theme='light'] .button.danger {
+  color: #ffffff;
+}
+
+:root[data-theme='light'] .button.danger:hover {
+  background: #a34431;
+}
+
+:root[data-theme='light'] .notifications-menu,
+:root[data-theme='light'] .profile-menu {
+  box-shadow: 0 18px 45px rgba(24, 35, 30, 0.16);
+}
+
+:root[data-theme='light'] .theme-option.active {
+  box-shadow: 0 1px 3px rgba(24, 35, 30, 0.12);
+}
+
+:root[data-theme='light'] input[type='date'],
+:root[data-theme='light'] input[type='datetime-local'],
+:root[data-theme='light'] input[type='time'],
+:root[data-theme='light'] input[type='number'] {
+  color-scheme: light;
+}
+
+:root[data-reduce-motion='true'] *,
+:root[data-reduce-motion='true'] *::before,
+:root[data-reduce-motion='true'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+  transition-duration: 0.01ms !important;
+}
