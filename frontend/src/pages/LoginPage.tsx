@@ -8,14 +8,14 @@ export const LoginPage = () => {
   const { login, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as { from?: string } | null)?.from ?? '/';
+  const from = (location.state as { from?: string } | null)?.from ?? '/dashboard';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   if (user) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={from} replace />;
   }
 
   const handleSubmit = async (event: FormEvent) => {
@@ -74,7 +74,7 @@ export const LoginPage = () => {
         </form>
 
         <p className="muted center">
-          New to StudyFlows? <Link to="/register">Create an account</Link>
+          New to StudyFlows? <Link to="/register" state={{ from }}>Create an account</Link>
         </p>
       </div>
     </div>

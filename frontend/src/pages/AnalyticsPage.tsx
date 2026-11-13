@@ -96,7 +96,7 @@ export const AnalyticsPage = () => {
         title="Analytics unavailable"
         description={error ?? 'Try again in a moment.'}
         actionLabel="Back to dashboard"
-        actionTo="/"
+        actionTo="/dashboard"
       />
     );
   }

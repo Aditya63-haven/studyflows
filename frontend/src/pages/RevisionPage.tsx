@@ -82,7 +82,7 @@ export const RevisionPage = () => {
         title="Unable to load revision"
         description={error ?? 'Try again in a moment.'}
         actionLabel="Back to dashboard"
-        actionTo="/"
+        actionTo="/dashboard"
       />
     );
   }

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { getErrorMessage } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import { ErrorBanner } from '../components/ErrorBanner';
@@ -7,6 +7,8 @@ import { ErrorBanner } from '../components/ErrorBanner';
 export const RegisterPage = () => {
   const { register, user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const from = (location.state as { from?: string } | null)?.from ?? '/dashboard';
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -14,7 +16,7 @@ export const RegisterPage = () => {
   const [submitting, setSubmitting] = useState(false);
 
   if (user) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={from} replace />;
   }
 
   const handleSubmit = async (event: FormEvent) => {
@@ -23,7 +25,7 @@ export const RegisterPage = () => {
     setSubmitting(true);
     try {
       await register(name, email, password);
-      navigate('/', { replace: true });
+      navigate(from, { replace: true });
     } catch (requestError) {
       setError(getErrorMessage(requestError));
     } finally {
@@ -84,7 +86,7 @@ export const RegisterPage = () => {
         </form>
 
         <p className="muted center">
-          Already have an account? <Link to="/login">Log in</Link>
+          Already have an account? <Link to="/login" state={{ from }}>Log in</Link>
         </p>
       </div>
     </div>
