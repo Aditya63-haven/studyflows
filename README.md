@@ -97,9 +97,12 @@ Edit `.env` and set at least:
 ```dotenv
 MONGODB_URI=mongodb://127.0.0.1:27017/studyflows
 JWT_SECRET=replace-with-a-long-random-secret
+AVATAR_STORAGE_DIR=storage/avatars
 ```
 
 Start MongoDB locally, or point `MONGODB_URI` at a hosted database.
+
+Profile pictures are written to `AVATAR_STORAGE_DIR` (resolved from the backend working directory) and served back through opaque URLs. The directory must be writable by the API and kept on persistent storage. A single local disk is not suitable for multiple backend instances unless the directory is a shared volume; for horizontal deployments, replace `LocalAvatarStorage` with an object-storage implementation of `IAvatarStorage`.
 
 Start the API:
 
@@ -172,16 +175,17 @@ npm run lint
 npm run format:check
 ```
 
-Frontend build:
+Frontend checks:
 
 ```bash
 cd frontend
+npm test
 npm run build
 ```
 
 ## API Endpoints
 
-All endpoints are prefixed with `/api`. Except for health, registration, login and public share endpoints, requests require:
+All endpoints are prefixed with `/api`. Except for health, registration, login, avatar images and public share endpoints, requests require:
 
 ```http
 Authorization: Bearer <token>
@@ -195,6 +199,10 @@ Authorization: Bearer <token>
 | POST   | `/auth/register` | Register a user          |
 | POST   | `/auth/login`    | Log in and receive a JWT |
 | GET    | `/auth/me`       | Get the current user     |
+| PATCH  | `/auth/me`       | Update current user name |
+| POST   | `/auth/me/avatar` | Upload or replace the current user's profile picture (multipart field `avatar`, JPEG/PNG/WebP, max 5 MB) |
+| DELETE | `/auth/me/avatar` | Remove the current user's profile picture |
+| GET    | `/avatars/:key`   | Publicly read a profile picture by opaque storage key |
 
 ### Study spaces and space-scoped items
 
