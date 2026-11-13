@@ -31,7 +31,11 @@ import { AssistantProposal } from '../services/AssistantService';
  */
 export class Serializer {
   public static user(user: User) {
-    return user.toJSON();
+    const avatarKey = user.getAvatarKey();
+    return {
+      ...user.toJSON(),
+      avatarUrl: avatarKey ? `/api/avatars/${encodeURIComponent(avatarKey)}` : null,
+    };
   }
 
   public static space(space: StudySpace) {
@@ -288,9 +292,7 @@ export class Serializer {
       date: item.date,
       topicCount: item.topicCount,
       minutes: item.minutes,
-      suggestions: item.suggestions.map((suggestion) =>
-        Serializer.attentionSuggestion(suggestion),
-      ),
+      suggestions: item.suggestions.map((suggestion) => Serializer.attentionSuggestion(suggestion)),
     };
   }
 
@@ -319,9 +321,7 @@ export class Serializer {
       planId: proposal.planId,
       planName: proposal.planName,
       strategy: proposal.strategy,
-      suggestion: proposal.suggestion
-        ? Serializer.attentionSuggestion(proposal.suggestion)
-        : null,
+      suggestion: proposal.suggestion ? Serializer.attentionSuggestion(proposal.suggestion) : null,
       needsConfirmation: proposal.needsConfirmation,
     };
   }

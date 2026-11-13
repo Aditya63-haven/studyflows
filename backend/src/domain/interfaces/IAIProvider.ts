@@ -26,6 +26,8 @@ export interface AIGeneratedQuestion {
 
 /**
  * Plan summary passed to the provider when interpreting an assistant command.
+ * `keywords` carries the plan name and its topic names so providers can match
+ * subject-style phrasing against what the plan actually covers.
  */
 export interface AICommandPlanSummary {
   id: string;
@@ -33,11 +35,18 @@ export interface AICommandPlanSummary {
   examDate: Date;
   incompleteTopics: number;
   missedMinutes: number;
+  keywords: string[];
 }
 
+/**
+ * Context for interpreting an assistant command. `subjects` lists the names
+ * and subjects of the user's study spaces so providers can detect subject
+ * mentions even when the plan name does not contain them.
+ */
 export interface AICommandInput {
   text: string;
   plans: AICommandPlanSummary[];
+  subjects: string[];
 }
 
 export type AICommandAction = 'move-work' | 'none';

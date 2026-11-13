@@ -11,6 +11,7 @@ export class UserMapper {
       name: document.name,
       email: document.email,
       passwordHash: document.passwordHash,
+      avatarKey: document.avatarKey ?? null,
       createdAt: document.createdAt,
       updatedAt: document.updatedAt,
     });
@@ -22,6 +23,7 @@ export class UserMapper {
       name: user.getName(),
       email: user.getEmail(),
       passwordHash: user.getPasswordHashForPersistence(),
+      avatarKey: user.getAvatarKey(),
       createdAt: user.getCreatedAt(),
       updatedAt: user.getUpdatedAt(),
     };

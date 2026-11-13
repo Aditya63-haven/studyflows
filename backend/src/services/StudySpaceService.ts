@@ -1,8 +1,11 @@
 import { ForbiddenError, NotFoundError } from '../errors';
 import { StudySpace } from '../domain/entities/StudySpace';
+import { BookmarkRepository } from '../repositories/BookmarkRepository';
 import { FlashcardDeckRepository } from '../repositories/FlashcardDeckRepository';
 import { NoteRepository } from '../repositories/NoteRepository';
+import { QuizAttemptRepository } from '../repositories/QuizAttemptRepository';
 import { QuizRepository } from '../repositories/QuizRepository';
+import { SharedLinkRepository } from '../repositories/SharedLinkRepository';
 import { StudySpaceRepository } from '../repositories/StudySpaceRepository';
 
 export interface CreateStudySpaceInput {
@@ -26,6 +29,9 @@ export class StudySpaceService {
     private readonly noteRepository: NoteRepository,
     private readonly quizRepository: QuizRepository,
     private readonly deckRepository: FlashcardDeckRepository,
+    private readonly attemptRepository: QuizAttemptRepository,
+    private readonly bookmarkRepository: BookmarkRepository,
+    private readonly sharedLinkRepository: SharedLinkRepository,
   ) {}
 
   public async create(ownerId: string, input: CreateStudySpaceInput): Promise<StudySpace> {
@@ -82,10 +88,30 @@ export class StudySpaceService {
 
   public async delete(ownerId: string, spaceId: string): Promise<void> {
     await this.getOwned(ownerId, spaceId);
+    const [notes, quizzes, decks] = await Promise.all([
+      this.noteRepository.findBySpace(spaceId),
+      this.quizRepository.findBySpace(spaceId),
+      this.deckRepository.findBySpace(spaceId),
+    ]);
+
+    const noteIds = notes.map((note) => note.getId());
+    const quizIds = quizzes.map((quiz) => quiz.getId());
+    const deckIds = decks.map((deck) => deck.getId());
+
+    const bookmarkCleanups = [
+      ...noteIds.map((noteId) => this.bookmarkRepository.deleteByItem(noteId, 'note')),
+      ...quizIds.map((quizId) => this.bookmarkRepository.deleteByItem(quizId, 'quiz')),
+      ...deckIds.map((deckId) => this.bookmarkRepository.deleteByItem(deckId, 'flashcarddeck')),
+    ];
+
     await Promise.all([
       this.noteRepository.deleteBySpace(spaceId),
       this.quizRepository.deleteBySpace(spaceId),
       this.deckRepository.deleteBySpace(spaceId),
+      ...quizIds.map((quizId) => this.attemptRepository.deleteByQuiz(quizId)),
+      ...bookmarkCleanups,
+      ...noteIds.map((noteId) => this.sharedLinkRepository.deleteByItem(noteId, 'note')),
+      ...quizIds.map((quizId) => this.sharedLinkRepository.deleteByItem(quizId, 'quiz')),
     ]);
     const deleted = await this.spaceRepository.delete(spaceId);
     if (!deleted) {

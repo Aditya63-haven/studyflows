@@ -16,6 +16,10 @@ export interface LoginInput {
   password: string;
 }
 
+export interface UpdateProfileInput {
+  name: string;
+}
+
 export interface AuthTokenPayload {
   userId: string;
   email: string;
@@ -23,7 +27,7 @@ export interface AuthTokenPayload {
 
 export interface AuthResult {
   token: string;
-  user: ReturnType<User['toJSON']>;
+  user: User;
 }
 
 /**
@@ -83,6 +87,17 @@ export class AuthService {
     return user;
   }
 
+  public async updateProfile(userId: string, input: UpdateProfileInput): Promise<User> {
+    const user = await this.getProfile(userId);
+    user.setName(input.name);
+
+    const updated = await this.userRepository.update(userId, user);
+    if (!updated) {
+      throw new NotFoundError('User not found');
+    }
+    return updated;
+  }
+
   public verifyToken(token: string): AuthTokenPayload {
     try {
       const payload = jwt.verify(token, this.config.jwtSecret) as JwtPayload;
@@ -101,11 +116,9 @@ export class AuthService {
   }
 
   private issueToken(user: User): AuthResult {
-    const token = jwt.sign(
-      { sub: user.getId(), email: user.getEmail() },
-      this.config.jwtSecret,
-      { expiresIn: this.config.jwtExpiresIn as SignOptions['expiresIn'] },
-    );
-    return { token, user: user.toJSON() };
+    const token = jwt.sign({ sub: user.getId(), email: user.getEmail() }, this.config.jwtSecret, {
+      expiresIn: this.config.jwtExpiresIn as SignOptions['expiresIn'],
+    });
+    return { token, user };
   }
 }

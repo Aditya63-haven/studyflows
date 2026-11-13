@@ -3,6 +3,7 @@ import { AppContainer } from '../container';
 import { createAuthMiddleware } from '../middleware/authMiddleware';
 import healthRouter from './healthRoutes';
 import { createAuthRoutes } from './authRoutes';
+import { createAvatarRoutes } from './avatarRoutes';
 import { createSpaceRoutes } from './spaceRoutes';
 import { createNoteRoutes } from './noteRoutes';
 import { createQuizRoutes } from './quizRoutes';
@@ -25,6 +26,7 @@ export const createApiRouter = (container: AppContainer): Router => {
 
   apiRouter.use('/health', healthRouter);
   apiRouter.use('/auth', createAuthRoutes(container, auth));
+  apiRouter.use('/avatars', createAvatarRoutes(container));
   apiRouter.use('/spaces', createSpaceRoutes(container, auth));
   apiRouter.use('/notes', createNoteRoutes(container, auth));
   apiRouter.use('/quizzes', createQuizRoutes(container, auth));

@@ -5,9 +5,11 @@ import { QuizAttempt } from '../domain/entities/QuizAttempt';
 import { QuizAnswer } from '../domain/interfaces/IGradable';
 import { QuestionFactory, QuestionFactoryInput } from '../patterns/factory/QuestionFactory';
 import { StudyFacade } from '../patterns/facade/StudyFacade';
+import { BookmarkRepository } from '../repositories/BookmarkRepository';
 import { NoteRepository } from '../repositories/NoteRepository';
 import { QuizAttemptRepository } from '../repositories/QuizAttemptRepository';
 import { QuizRepository } from '../repositories/QuizRepository';
+import { SharedLinkRepository } from '../repositories/SharedLinkRepository';
 import { StudySpaceRepository } from '../repositories/StudySpaceRepository';
 
 export interface CreateQuizInput {
@@ -38,6 +40,8 @@ export class QuizService {
     private readonly spaceRepository: StudySpaceRepository,
     private readonly attemptRepository: QuizAttemptRepository,
     private readonly studyFacade: StudyFacade,
+    private readonly bookmarkRepository: BookmarkRepository,
+    private readonly sharedLinkRepository: SharedLinkRepository,
   ) {}
 
   public async listBySpace(ownerId: string, spaceId: string): Promise<Quiz[]> {
@@ -97,6 +101,11 @@ export class QuizService {
 
   public async delete(ownerId: string, quizId: string): Promise<void> {
     await this.getOwned(ownerId, quizId);
+    await Promise.all([
+      this.attemptRepository.deleteByQuiz(quizId),
+      this.bookmarkRepository.deleteByItem(quizId, 'quiz'),
+      this.sharedLinkRepository.deleteByItem(quizId, 'quiz'),
+    ]);
     const deleted = await this.quizRepository.delete(quizId);
     if (!deleted) {
       throw new NotFoundError('Quiz not found');

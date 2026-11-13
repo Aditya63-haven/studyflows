@@ -22,6 +22,7 @@ import { SharedLinkRepository } from './repositories/SharedLinkRepository';
 import { StudySessionRepository } from './repositories/StudySessionRepository';
 import { StudySpaceRepository } from './repositories/StudySpaceRepository';
 import { UserRepository } from './repositories/UserRepository';
+import { AvatarService } from './services/AvatarService';
 import { AnalyticsService } from './services/AnalyticsService';
 import { AssistantService } from './services/AssistantService';
 import { AttentionService } from './services/AttentionService';
@@ -30,6 +31,7 @@ import { AvailabilityService } from './services/AvailabilityService';
 import { BookmarkService } from './services/BookmarkService';
 import { ExamPlanService } from './services/ExamPlanService';
 import { FlashcardService } from './services/FlashcardService';
+import { ImageProcessor } from './services/ImageProcessor';
 import { NoteService } from './services/NoteService';
 import { NotificationService } from './services/NotificationService';
 import { QuizService } from './services/QuizService';
@@ -38,11 +40,13 @@ import { SearchService } from './services/SearchService';
 import { SharingService } from './services/SharingService';
 import { StudySessionService } from './services/StudySessionService';
 import { StudySpaceService } from './services/StudySpaceService';
+import { LocalAvatarStorage } from './storage/LocalAvatarStorage';
 
 export interface AppContainer {
   config: Config;
   eventBus: EventBus;
   authService: AuthService;
+  avatarService: AvatarService;
   studySpaceService: StudySpaceService;
   noteService: NoteService;
   quizService: QuizService;
@@ -61,16 +65,12 @@ export interface AppContainer {
 }
 
 const createRevisionStrategy = (config: Config): IRevisionStrategy =>
-  config.revisionStrategy === 'simple'
-    ? new SimpleMemoryStrengthStrategy()
-    : new SM2Strategy();
+  config.revisionStrategy === 'simple' ? new SimpleMemoryStrengthStrategy() : new SM2Strategy();
 
 const createAIProvider = (config: Config): IAIProvider => {
   if (config.aiProvider === 'external') {
     if (!config.aiBaseUrl || !config.aiApiKey) {
-      throw new Error(
-        '[Config] AI_BASE_URL and AI_API_KEY are required when AI_PROVIDER=external',
-      );
+      throw new Error('[Config] AI_BASE_URL and AI_API_KEY are required when AI_PROVIDER=external');
     }
     return new ExternalAIProvider(config.aiBaseUrl, config.aiApiKey);
   }
@@ -87,6 +87,8 @@ export const createContainer = (): AppContainer => {
   const config = Config.getInstance();
 
   const userRepository = new UserRepository();
+  const avatarStorage = new LocalAvatarStorage(config.avatarStorageDir);
+  const avatarService = new AvatarService(userRepository, avatarStorage, new ImageProcessor());
   const spaceRepository = new StudySpaceRepository();
   const noteRepository = new NoteRepository();
   const quizRepository = new QuizRepository();
@@ -143,24 +145,37 @@ export const createContainer = (): AppContainer => {
     config,
     eventBus,
     authService: new AuthService(userRepository, config),
+    avatarService,
     studySpaceService: new StudySpaceService(
       spaceRepository,
       noteRepository,
       quizRepository,
       deckRepository,
+      attemptRepository,
+      bookmarkRepository,
+      sharedLinkRepository,
     ),
-    noteService: new NoteService(noteRepository, spaceRepository, studyFacade),
+    noteService: new NoteService(
+      noteRepository,
+      spaceRepository,
+      studyFacade,
+      bookmarkRepository,
+      sharedLinkRepository,
+    ),
     quizService: new QuizService(
       quizRepository,
       noteRepository,
       spaceRepository,
       attemptRepository,
       studyFacade,
+      bookmarkRepository,
+      sharedLinkRepository,
     ),
     flashcardService: new FlashcardService(
       deckRepository,
       spaceRepository,
       revisionStrategy,
+      bookmarkRepository,
     ),
     revisionService,
     examPlanService: new ExamPlanService(examPlanRepository, availabilityRepository),
@@ -171,13 +186,10 @@ export const createContainer = (): AppContainer => {
     assistantService: new AssistantService(
       aiProvider,
       examPlanRepository,
+      spaceRepository,
       attentionService,
     ),
-    sharingService: new SharingService(
-      sharedLinkRepository,
-      noteRepository,
-      quizRepository,
-    ),
+    sharingService: new SharingService(sharedLinkRepository, noteRepository, quizRepository),
     bookmarkService: new BookmarkService(
       bookmarkRepository,
       noteRepository,

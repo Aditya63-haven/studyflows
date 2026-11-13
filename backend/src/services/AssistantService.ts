@@ -8,6 +8,7 @@ import { RescheduleStrategyName } from '../domain/interfaces/IRescheduleStrategy
 import { AppliedChange, AttentionSuggestionView } from './AttentionService';
 import { AttentionService } from './AttentionService';
 import { ExamPlanRepository } from '../repositories/ExamPlanRepository';
+import { StudySpaceRepository } from '../repositories/StudySpaceRepository';
 
 export interface AssistantProposal {
   understood: boolean;
@@ -31,6 +32,7 @@ export class AssistantService {
   constructor(
     private readonly aiProvider: IAIProvider,
     private readonly planRepository: ExamPlanRepository,
+    private readonly spaceRepository: StudySpaceRepository,
     private readonly attentionService: AttentionService,
   ) {}
 
@@ -43,7 +45,13 @@ export class AssistantService {
     text: string,
     now: Date = new Date(),
   ): Promise<AssistantProposal> {
-    const plans = await this.planRepository.findByOwner(userId);
+    const [plans, spaces] = await Promise.all([
+      this.planRepository.findByOwner(userId),
+      this.spaceRepository.findByOwner(userId),
+    ]);
+    const subjects = [
+      ...new Set(spaces.flatMap((space) => [space.getName(), space.getSubject()])),
+    ];
     const summaries: AICommandPlanSummary[] = plans.map((plan) => ({
       id: plan.getId(),
       name: plan.getName(),
@@ -52,11 +60,16 @@ export class AssistantService {
       missedMinutes: plan
         .getMissedWork(now)
         .reduce((total, work) => total + work.minutes, 0),
+      keywords: [
+        plan.getName(),
+        ...plan.getTopics().map((topic) => topic.getName()),
+      ],
     }));
 
     const interpretation = await this.aiProvider.interpretCommand({
       text,
       plans: summaries,
+      subjects,
     });
 
     if (

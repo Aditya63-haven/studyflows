@@ -4,3 +4,4 @@ export { NotFoundError } from './NotFoundError';
 export { AuthError } from './AuthError';
 export { ForbiddenError } from './ForbiddenError';
 export { ConflictError } from './ConflictError';
+export { PayloadTooLargeError } from './PayloadTooLargeError';

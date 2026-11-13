@@ -23,6 +23,14 @@ export class BookmarkRepository extends BaseRepository<Bookmark, BookmarkDocumen
       : null;
   }
 
+  public async deleteByItem(
+    itemId: string,
+    itemType: 'note' | 'quiz' | 'flashcarddeck',
+  ): Promise<number> {
+    const result = await this.model.deleteMany({ itemId, itemType }).exec();
+    return result.deletedCount ?? 0;
+  }
+
   protected override toDomain(document: BookmarkDocument): Bookmark {
     return BookmarkMapper.toDomain(document);
   }

@@ -3,6 +3,7 @@ import { Flashcard } from '../domain/entities/Flashcard';
 import { FlashcardDeck } from '../domain/entities/FlashcardDeck';
 import { ReviewRating } from '../domain/interfaces/IRevisionStrategy';
 import { IRevisionStrategy } from '../domain/interfaces/IRevisionStrategy';
+import { BookmarkRepository } from '../repositories/BookmarkRepository';
 import { FlashcardDeckRepository } from '../repositories/FlashcardDeckRepository';
 import { StudySpaceRepository } from '../repositories/StudySpaceRepository';
 
@@ -35,6 +36,7 @@ export class FlashcardService {
     private readonly deckRepository: FlashcardDeckRepository,
     private readonly spaceRepository: StudySpaceRepository,
     private readonly revisionStrategy: IRevisionStrategy,
+    private readonly bookmarkRepository: BookmarkRepository,
   ) {}
 
   public async listBySpace(ownerId: string, spaceId: string): Promise<FlashcardDeck[]> {
@@ -90,6 +92,7 @@ export class FlashcardService {
 
   public async delete(ownerId: string, deckId: string): Promise<void> {
     await this.getOwned(ownerId, deckId);
+    await this.bookmarkRepository.deleteByItem(deckId, 'flashcarddeck');
     const deleted = await this.deckRepository.delete(deckId);
     if (!deleted) {
       throw new NotFoundError('Flashcard deck not found');

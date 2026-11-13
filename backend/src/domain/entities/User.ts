@@ -1,3 +1,4 @@
+import { AVATAR_KEY_PATTERN } from '../../config/avatar';
 import { ValidationError } from '../../errors';
 import { requireDate, requireNonEmpty, resolveId } from '../base/helpers';
 
@@ -6,6 +7,7 @@ export interface UserProps {
   name: string;
   email: string;
   passwordHash: string;
+  avatarKey?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -24,6 +26,7 @@ export class User {
   private _name: string;
   private _email: string;
   private _passwordHash: string;
+  private _avatarKey: string | null;
   private readonly _createdAt: Date;
   private _updatedAt: Date;
 
@@ -32,6 +35,7 @@ export class User {
     this._name = requireNonEmpty(props.name, 'name');
     this._email = User.normalizeEmail(props.email);
     this._passwordHash = User.validatePasswordHash(props.passwordHash);
+    this._avatarKey = User.normalizeAvatarKey(props.avatarKey);
     this._createdAt = props.createdAt ? requireDate(props.createdAt, 'createdAt') : new Date();
     this._updatedAt = props.updatedAt ? requireDate(props.updatedAt, 'updatedAt') : new Date();
   }
@@ -65,6 +69,22 @@ export class User {
 
   public hasPasswordHash(): boolean {
     return this._passwordHash.length > 0;
+  }
+
+  public getAvatarKey(): string | null {
+    return this._avatarKey;
+  }
+
+  public setAvatarKey(avatarKey: string): void {
+    this._avatarKey = User.normalizeAvatarKey(avatarKey);
+    this.touch();
+  }
+
+  public clearAvatarKey(): void {
+    if (this._avatarKey !== null) {
+      this._avatarKey = null;
+      this.touch();
+    }
   }
 
   /**
@@ -134,5 +154,15 @@ export class User {
       throw new ValidationError('passwordHash is not a valid hash');
     }
     return hash;
+  }
+
+  private static normalizeAvatarKey(avatarKey: string | null | undefined): string | null {
+    if (avatarKey === null || avatarKey === undefined) {
+      return null;
+    }
+    if (!AVATAR_KEY_PATTERN.test(avatarKey)) {
+      throw new ValidationError('avatarKey is not a valid storage key');
+    }
+    return avatarKey;
   }
 }

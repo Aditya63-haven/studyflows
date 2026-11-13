@@ -22,6 +22,14 @@ export class SharedLinkRepository extends BaseRepository<SharedLink, SharedLinkD
     return this.findMany({ itemId, itemType, revoked: false });
   }
 
+  public async deleteByItem(
+    itemId: string,
+    itemType: 'note' | 'quiz',
+  ): Promise<number> {
+    const result = await this.model.deleteMany({ itemId, itemType }).exec();
+    return result.deletedCount ?? 0;
+  }
+
   protected override toDomain(document: SharedLinkDocument): SharedLink {
     return SharedLinkMapper.toDomain(document);
   }

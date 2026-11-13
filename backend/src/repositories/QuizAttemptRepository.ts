@@ -23,6 +23,11 @@ export class QuizAttemptRepository extends BaseRepository<QuizAttempt, QuizAttem
     return this.findMany({ owner: userId, quizId });
   }
 
+  public async deleteByQuiz(quizId: string): Promise<number> {
+    const result = await this.model.deleteMany({ quizId }).exec();
+    return result.deletedCount ?? 0;
+  }
+
   protected override toDomain(document: QuizAttemptDocument): QuizAttempt {
     return QuizAttemptMapper.toDomain(document);
   }

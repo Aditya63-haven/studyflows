@@ -1,7 +1,9 @@
 import { ForbiddenError, NotFoundError } from '../errors';
 import { Note } from '../domain/entities/Note';
 import { StudyFacade } from '../patterns/facade/StudyFacade';
+import { BookmarkRepository } from '../repositories/BookmarkRepository';
 import { NoteRepository } from '../repositories/NoteRepository';
+import { SharedLinkRepository } from '../repositories/SharedLinkRepository';
 import { StudySpaceRepository } from '../repositories/StudySpaceRepository';
 
 export interface CreateNoteInput {
@@ -27,6 +29,8 @@ export class NoteService {
     private readonly noteRepository: NoteRepository,
     private readonly spaceRepository: StudySpaceRepository,
     private readonly studyFacade: StudyFacade,
+    private readonly bookmarkRepository: BookmarkRepository,
+    private readonly sharedLinkRepository: SharedLinkRepository,
   ) {}
 
   public async listBySpace(ownerId: string, spaceId: string): Promise<Note[]> {
@@ -82,6 +86,10 @@ export class NoteService {
 
   public async delete(ownerId: string, noteId: string): Promise<void> {
     await this.getOwned(ownerId, noteId);
+    await Promise.all([
+      this.bookmarkRepository.deleteByItem(noteId, 'note'),
+      this.sharedLinkRepository.deleteByItem(noteId, 'note'),
+    ]);
     const deleted = await this.noteRepository.delete(noteId);
     if (!deleted) {
       throw new NotFoundError('Note not found');

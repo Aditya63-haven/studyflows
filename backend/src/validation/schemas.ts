@@ -78,6 +78,12 @@ export const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+export const updateProfileSchema = z
+  .object({
+    name: z.string().trim().min(1).max(120),
+  })
+  .strict();
+
 export const createSpaceSchema = z.object({
   name: z.string().trim().min(1).max(120),
   subject: z.string().trim().min(1).max(120),
