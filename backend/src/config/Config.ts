@@ -26,6 +26,7 @@ export class Config {
   private readonly _aiApiKey: string | undefined;
   private readonly _aiBaseUrl: string | undefined;
   private readonly _revisionStrategy: RevisionStrategyName;
+  private readonly _avatarStorageDir: string;
 
   private constructor() {
     dotenv.config({ path: resolve(__dirname, '../../.env') });
@@ -40,6 +41,7 @@ export class Config {
     this._aiApiKey = Config.optionalEnv('AI_API_KEY');
     this._aiBaseUrl = Config.optionalEnv('AI_BASE_URL');
     this._revisionStrategy = Config.parseRevisionStrategy(process.env.REVISION_STRATEGY);
+    this._avatarStorageDir = resolve(Config.optionalEnv('AVATAR_STORAGE_DIR') ?? 'storage/avatars');
   }
 
   /**
@@ -90,6 +92,10 @@ export class Config {
 
   public get revisionStrategy(): RevisionStrategyName {
     return this._revisionStrategy;
+  }
+
+  public get avatarStorageDir(): string {
+    return this._avatarStorageDir;
   }
 
   public get isProduction(): boolean {
