@@ -1,7 +1,9 @@
 import bcrypt from 'bcryptjs';
+import { randomBytes } from 'crypto';
 import { Config } from './config/Config';
 import { Database } from './config/Database';
 import { addDays, startOfDay } from './domain/base/helpers';
+import { DayAvailability } from './domain/entities/DayAvailability';
 import { ExamPlan } from './domain/entities/ExamPlan';
 import { Flashcard } from './domain/entities/Flashcard';
 import { FlashcardDeck } from './domain/entities/FlashcardDeck';
@@ -10,16 +12,21 @@ import { Quiz } from './domain/entities/Quiz';
 import { QuizAnswer } from './domain/interfaces/IGradable';
 import { QuizAttempt } from './domain/entities/QuizAttempt';
 import { RevisionSchedule } from './domain/entities/RevisionSchedule';
+import { SharedLink } from './domain/entities/SharedLink';
+import { StudentAvailability } from './domain/entities/StudentAvailability';
+import { StudyDay } from './domain/entities/StudyDay';
 import { StudySession } from './domain/entities/StudySession';
 import { StudySpace } from './domain/entities/StudySpace';
 import { Topic } from './domain/entities/Topic';
 import { User } from './domain/entities/User';
 import { QuestionFactory } from './patterns/factory/QuestionFactory';
 import { ExamPlanBuilder } from './patterns/builder/ExamPlanBuilder';
+import { AvailabilityModel } from './persistence/schemas/availability.schema';
 import { BookmarkModel } from './persistence/schemas/bookmark.schema';
 import { ExamPlanModel } from './persistence/schemas/examPlan.schema';
 import { FlashcardDeckModel } from './persistence/schemas/flashcardDeck.schema';
 import { NoteModel } from './persistence/schemas/note.schema';
+import { NotificationModel } from './persistence/schemas/notification.schema';
 import { QuizAttemptModel } from './persistence/schemas/quizAttempt.schema';
 import { QuizModel } from './persistence/schemas/quiz.schema';
 import { RevisionScheduleModel } from './persistence/schemas/revisionSchedule.schema';
@@ -27,12 +34,14 @@ import { SharedLinkModel } from './persistence/schemas/sharedLink.schema';
 import { StudySessionModel } from './persistence/schemas/studySession.schema';
 import { StudySpaceModel } from './persistence/schemas/studySpace.schema';
 import { UserModel } from './persistence/schemas/user.schema';
+import { AvailabilityRepository } from './repositories/AvailabilityRepository';
 import { ExamPlanRepository } from './repositories/ExamPlanRepository';
 import { FlashcardDeckRepository } from './repositories/FlashcardDeckRepository';
 import { NoteRepository } from './repositories/NoteRepository';
 import { QuizAttemptRepository } from './repositories/QuizAttemptRepository';
 import { QuizRepository } from './repositories/QuizRepository';
 import { RevisionScheduleRepository } from './repositories/RevisionScheduleRepository';
+import { SharedLinkRepository } from './repositories/SharedLinkRepository';
 import { StudySessionRepository } from './repositories/StudySessionRepository';
 import { StudySpaceRepository } from './repositories/StudySpaceRepository';
 import { UserRepository } from './repositories/UserRepository';
@@ -51,6 +60,8 @@ const DBMS_DECK_ID = 'seed-deck-dbms';
 const ARRAYS_TOPIC_ID = 'seed-topic-arrays';
 const TREES_TOPIC_ID = 'seed-topic-trees';
 const NORMALIZATION_TOPIC_ID = 'seed-topic-normalization';
+const SQL_JOINS_TOPIC_ID = 'seed-topic-sql-joins';
+const INDEXING_TOPIC_ID = 'seed-topic-indexing';
 
 const cleanupDemoData = async (userId: string): Promise<void> => {
   await Promise.all([
@@ -64,6 +75,8 @@ const cleanupDemoData = async (userId: string): Promise<void> => {
     QuizModel.deleteMany({ owner: userId }).exec(),
     NoteModel.deleteMany({ owner: userId }).exec(),
     StudySpaceModel.deleteMany({ owner: userId }).exec(),
+    AvailabilityModel.deleteMany({ owner: userId }).exec(),
+    NotificationModel.deleteMany({ owner: userId }).exec(),
   ]);
 };
 
@@ -253,6 +266,8 @@ const seed = async (): Promise<void> => {
     const revisionRepository = new RevisionScheduleRepository();
     const examPlanRepository = new ExamPlanRepository();
     const sessionRepository = new StudySessionRepository();
+    const availabilityRepository = new AvailabilityRepository();
+    const sharedLinkRepository = new SharedLinkRepository();
 
     const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 10);
     const user = await userRepository.create(
@@ -331,11 +346,37 @@ const seed = async (): Promise<void> => {
     const dsaQuiz = buildDsaQuiz(user.getId());
     const dbmsQuiz = buildDbmsQuiz(user.getId());
 
+    // Public read-only link for the shared quiz (usable without login).
+    const shareToken = randomBytes(18).toString('base64url');
+    dbmsQuiz.makeShareable(shareToken);
+
+    // Weekly study availability: 2 hours on weekdays, more on weekends.
+    const availability = new StudentAvailability({
+      id: 'seed-availability',
+      userId: user.getId(),
+      days: [0, 1, 2, 3, 4].map(
+        (weekday) => new DayAvailability({ weekday, budgetMinutes: 120, available: true }),
+      ).concat([
+        new DayAvailability({ weekday: 5, budgetMinutes: 240, available: true }),
+        new DayAvailability({ weekday: 6, budgetMinutes: 180, available: true }),
+      ]),
+    });
+
     await Promise.all([
       quizRepository.create(dsaQuiz),
       quizRepository.create(dbmsQuiz),
       deckRepository.create(buildDsaDeck(user.getId(), now)),
       deckRepository.create(buildDbmsDeck(user.getId(), now)),
+      sharedLinkRepository.create(
+        new SharedLink({
+          id: 'seed-share-dbms-quiz',
+          token: shareToken,
+          itemId: DBMS_QUIZ_ID,
+          itemType: 'quiz',
+          ownerId: user.getId(),
+        }),
+      ),
+      availabilityRepository.create(availability),
       sessionRepository.create(
         new StudySession({
           id: 'seed-session-1',
@@ -434,8 +475,49 @@ const seed = async (): Promise<void> => {
       .setTopics(topics)
       .build(now);
 
+    // Show progress: the first topic is already done.
+    examPlan.markTopicComplete(ARRAYS_TOPIC_ID);
+
+    // Simulate a missed study day: the first day is in the past and still has
+    // unfinished topics, so it shows up under "needs attention".
+    const builtDays = examPlan.getStudyDays();
+    const firstDay = builtDays[0];
+    examPlan.setStudyDays([
+      new StudyDay({
+        id: firstDay.getId(),
+        date: addDays(today, -1),
+        topicIds: firstDay.getTopicIds(),
+        completedTopicIds: firstDay.getCompletedTopicIds(),
+        plannedMinutes: firstDay.getPlannedMinutes(),
+      }),
+      ...builtDays.slice(1),
+    ]);
+
+    // A second plan whose exam is only two days away.
+    const quizExamPlan: ExamPlan = new ExamPlanBuilder()
+      .setName('Database Systems Quiz')
+      .setOwnerId(user.getId())
+      .setExamDate(addDays(today, 2))
+      .setDailyStudyHours(1)
+      .setTopics([
+        new Topic({
+          id: SQL_JOINS_TOPIC_ID,
+          name: 'SQL Joins',
+          description: 'Inner, outer and self joins.',
+          estimatedMinutes: 45,
+        }),
+        new Topic({
+          id: INDEXING_TOPIC_ID,
+          name: 'Indexing and Query Plans',
+          description: 'B-tree indexes and query optimization.',
+          estimatedMinutes: 40,
+        }),
+      ])
+      .build(now);
+
     await Promise.all([
       examPlanRepository.create(examPlan),
+      examPlanRepository.create(quizExamPlan),
       revisionRepository.create(
         new RevisionSchedule({
           id: 'seed-revision-arrays',
@@ -483,7 +565,13 @@ const seed = async (): Promise<void> => {
     console.info('[seed] Demo data created successfully.');
     console.info('[seed] Login email: %s', DEMO_EMAIL);
     console.info('[seed] Login password: %s', DEMO_PASSWORD);
-    console.info('[seed] Seeded 2 spaces, 3 notes, 2 quizzes, 2 decks and 1 exam plan.');
+    console.info(
+      '[seed] Seeded 2 spaces, 3 notes, 2 quizzes, 2 decks, 2 exam plans, 3 study sessions, weekly availability and a shared quiz.',
+    );
+    console.info('[seed] Shared quiz: /api/public/quizzes/%s', shareToken);
+    console.info(
+      '[seed] Demo highlights: a missed study day and an exam in 2 days under "needs attention".',
+    );
   } finally {
     await Database.getInstance().disconnect();
   }

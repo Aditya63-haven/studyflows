@@ -108,6 +108,16 @@ export class MockAIProvider implements IAIProvider {
 
     if (!plan) {
       const planNames = input.plans.map((candidate) => `"${candidate.name}"`).join(', ');
+      const subject = MockAIProvider.matchSubject(input.text, input.subjects);
+      if (subject) {
+        return {
+          understood: false,
+          action: 'none',
+          strategy: null,
+          planId: null,
+          response: `I found no exam plan matching "${subject}". Which plan should I adjust? You have: ${planNames}.`,
+        };
+      }
       return {
         understood: false,
         action: 'none',
@@ -145,7 +155,10 @@ export class MockAIProvider implements IAIProvider {
     let best: { plan: AICommandPlanSummary; score: number } | null = null;
 
     for (const plan of plans) {
-      const planTokens = MockAIProvider.extractKeywords(plan.name);
+      const planTokens = MockAIProvider.extractKeywords(
+        [plan.name, ...plan.keywords].join(' '),
+        Number.MAX_SAFE_INTEGER,
+      );
       let score = 0;
       for (const word of words) {
         const stem = word.slice(0, 4);
@@ -168,6 +181,37 @@ export class MockAIProvider implements IAIProvider {
       return plans[0];
     }
     return null;
+  }
+
+  private static matchSubject(text: string, subjects: string[]): string | null {
+    if (subjects.length === 0) {
+      return null;
+    }
+
+    const words = MockAIProvider.extractKeywords(text);
+    let best: { subject: string; score: number } | null = null;
+
+    for (const subject of subjects) {
+      const subjectTokens = MockAIProvider.extractKeywords(
+        subject,
+        Number.MAX_SAFE_INTEGER,
+      );
+      let score = 0;
+      for (const word of words) {
+        const stem = word.slice(0, 4);
+        for (const token of subjectTokens) {
+          if (word === token || token.startsWith(stem) || word.startsWith(token.slice(0, 4))) {
+            score += 1;
+            break;
+          }
+        }
+      }
+      if (score > 0 && (!best || score > best.score)) {
+        best = { subject, score };
+      }
+    }
+
+    return best ? best.subject : null;
   }
 
   private buildQuestions(input: AIQuizInput): AIGeneratedQuestion[] {
@@ -248,14 +292,14 @@ export class MockAIProvider implements IAIProvider {
       .filter((sentence) => sentence.length > 0);
   }
 
-  private static extractKeywords(text: string): string[] {
+  private static extractKeywords(text: string, limit = 8): string[] {
     const words = text
       .toLowerCase()
       .replace(/[^a-z0-9\s'-]/g, ' ')
       .split(/\s+/)
       .filter((word) => word.length >= 4 && !STOP_WORDS.has(word));
 
-    return [...new Set(words)].slice(0, 8);
+    return [...new Set(words)].slice(0, limit);
   }
 
   private static capitalize(value: string): string {
