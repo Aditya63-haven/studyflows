@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { AiAccessSettings } from '../components/AiAccessSettings';
 import { Card } from '../components/Card';
 import { PageHeader } from '../components/PageHeader';
 import { ThemeSelector } from '../components/ThemeSelector';
@@ -73,6 +74,8 @@ export const SettingsPage = () => {
           </Card>
         </div>
       </div>
+
+      <AiAccessSettings />
     </div>
   );
 };

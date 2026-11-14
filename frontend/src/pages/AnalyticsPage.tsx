@@ -12,6 +12,7 @@ import { Loading } from '../components/Loading';
 import { PageHeader } from '../components/PageHeader';
 import { ProgressBar } from '../components/ProgressBar';
 import { formatDateTime, formatMinutes } from '../utils/format';
+import { parseNumericInput } from '../utils/numericInput';
 
 export const AnalyticsPage = () => {
   const [analytics, setAnalytics] = useState<AnalyticsOverview | null>(null);
@@ -23,7 +24,7 @@ export const AnalyticsPage = () => {
   const [notice, setNotice] = useState<string | null>(null);
   const [spaceId, setSpaceId] = useState('');
   const [subject, setSubject] = useState('');
-  const [durationMinutes, setDurationMinutes] = useState(30);
+  const [durationMinutes, setDurationMinutes] = useState('30');
 
   useEffect(() => {
     let active = true;
@@ -65,19 +66,30 @@ export const AnalyticsPage = () => {
     event.preventDefault();
     setError(null);
     setNotice(null);
+
+    const minutes = parseNumericInput(durationMinutes);
+    if (minutes === null) {
+      setError('Enter a study duration.');
+      return;
+    }
+    if (!Number.isInteger(minutes) || minutes < 1 || minutes > 1440) {
+      setError('Duration must be between 1 and 1440 minutes.');
+      return;
+    }
+
     setLogging(true);
     try {
       const endedAt = new Date();
-      const startedAt = new Date(endedAt.getTime() - durationMinutes * 60_000);
+      const startedAt = new Date(endedAt.getTime() - minutes * 60_000);
       await sessionsApi.create({
         spaceId: spaceId || null,
         subject: subject.trim() || undefined,
-        durationMinutes,
+        durationMinutes: minutes,
         startedAt: startedAt.toISOString(),
         endedAt: endedAt.toISOString(),
       });
       await refresh();
-      setNotice(`Logged ${durationMinutes} minutes of study time.`);
+      setNotice(`Logged ${minutes} minutes of study time.`);
       setSubject('');
     } catch (requestError) {
       setError(getErrorMessage(requestError));
@@ -210,7 +222,7 @@ export const AnalyticsPage = () => {
                 min={1}
                 max={1440}
                 value={durationMinutes}
-                onChange={(event) => setDurationMinutes(Number(event.target.value))}
+                onChange={(event) => setDurationMinutes(event.target.value)}
                 required
               />
             </label>

@@ -1,6 +1,7 @@
 import { RequestHandler, Router } from 'express';
 import { AppContainer } from '../container';
 import { StudySpaceController } from '../controllers/StudySpaceController';
+import { createSpaceDocumentRoutes } from './documentRoutes';
 import { createSpaceNoteRoutes } from './noteRoutes';
 import { createSpaceQuizRoutes } from './quizRoutes';
 import { createSpaceFlashcardRoutes } from './flashcardRoutes';
@@ -22,6 +23,7 @@ export const createSpaceRoutes = (
   router.get('/', controller.list);
   router.post('/', validate({ body: createSpaceSchema }), controller.create);
 
+  router.use('/:spaceId/documents', createSpaceDocumentRoutes(container, auth));
   router.use('/:spaceId/notes', createSpaceNoteRoutes(container, auth));
   router.use('/:spaceId/quizzes', createSpaceQuizRoutes(container, auth));
   router.use('/:spaceId/decks', createSpaceFlashcardRoutes(container, auth));

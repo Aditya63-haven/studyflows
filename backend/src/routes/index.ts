@@ -5,6 +5,7 @@ import healthRouter from './healthRoutes';
 import { createAuthRoutes } from './authRoutes';
 import { createAvatarRoutes } from './avatarRoutes';
 import { createSpaceRoutes } from './spaceRoutes';
+import { createDocumentRoutes } from './documentRoutes';
 import { createNoteRoutes } from './noteRoutes';
 import { createQuizRoutes } from './quizRoutes';
 import { createFlashcardRoutes } from './flashcardRoutes';
@@ -19,6 +20,7 @@ import { createAvailabilityRoutes } from './availabilityRoutes';
 import { createNotificationRoutes } from './notificationRoutes';
 import { createAttentionRoutes } from './attentionRoutes';
 import { createAssistantRoutes } from './assistantRoutes';
+import { createAiAccessRoutes } from './aiAccessRoutes';
 
 export const createApiRouter = (container: AppContainer): Router => {
   const apiRouter = Router();
@@ -28,6 +30,7 @@ export const createApiRouter = (container: AppContainer): Router => {
   apiRouter.use('/auth', createAuthRoutes(container, auth));
   apiRouter.use('/avatars', createAvatarRoutes(container));
   apiRouter.use('/spaces', createSpaceRoutes(container, auth));
+  apiRouter.use('/documents', createDocumentRoutes(container, auth));
   apiRouter.use('/notes', createNoteRoutes(container, auth));
   apiRouter.use('/quizzes', createQuizRoutes(container, auth));
   apiRouter.use('/decks', createFlashcardRoutes(container, auth));
@@ -43,6 +46,7 @@ export const createApiRouter = (container: AppContainer): Router => {
   apiRouter.use('/notifications', createNotificationRoutes(container, auth));
   apiRouter.use('/attention', createAttentionRoutes(container, auth));
   apiRouter.use('/assistant', createAssistantRoutes(container, auth));
+  apiRouter.use('/ai-access', createAiAccessRoutes(container, auth));
 
   return apiRouter;
 };

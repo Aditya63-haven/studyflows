@@ -9,6 +9,7 @@ The project deliberately uses classes, inheritance, interfaces, design patterns 
 - JWT authentication with hashed passwords.
 - Study spaces for each subject, grouping notes, quizzes and flashcard decks.
 - Markdown notes with AI-assisted condensing and quiz generation.
+- Invite-only Gemini study assistant grounded in selected notes from a student's own spaces.
 - Quizzes with MCQ, multi-select and true/false questions, automatic grading and stored attempts.
 - Flashcard decks with flip, shuffle and Again/Hard/Good/Easy review ratings.
 - Spaced-repetition scheduling with due-today, needs-revision and mastered views.
@@ -78,7 +79,7 @@ Studyflows/
 
 ## Prerequisites
 
-- Node.js 18 or newer
+- Node.js 22 or newer (required by the Gemini SDK)
 - npm
 - MongoDB running locally, or a MongoDB connection string
 
@@ -101,6 +102,17 @@ AVATAR_STORAGE_DIR=storage/avatars
 ```
 
 Start MongoDB locally, or point `MONGODB_URI` at a hosted database.
+
+The default `AI_PROVIDER=mock` needs no external services. To enable the real Gemini study assistant, add:
+
+```dotenv
+AI_PROVIDER=gemini
+AI_API_KEY=your-google-ai-api-key
+AI_MODEL=gemini-3.8-flash
+AI_ACCESS_ADMIN_EMAIL=you@university.edu
+```
+
+Register an account with exactly that admin email. The admin can open **Settings → AI access** and invite other student emails. Invites remain pending until that email registers; revoking access takes effect immediately. Chat, note condensing, quiz generation and assistant planning commands all require access. Assistant requests are rate limited per user and globally using the limits in `.env.example`.
 
 Profile pictures are written to `AVATAR_STORAGE_DIR` (resolved from the backend working directory) and served back through opaque URLs. The directory must be writable by the API and kept on persistent storage. A single local disk is not suitable for multiple backend instances unless the directory is a shared volume; for horizontal deployments, replace `LocalAvatarStorage` with an object-storage implementation of `IAvatarStorage`.
 
@@ -165,7 +177,8 @@ The Jest suite includes:
 
 - Unit tests for every question subtype, mixed quiz grading, the question factory, both revision strategies, the exam-plan builder, error classes, the observer flow and singleton configuration.
 - An API integration test that registers and logs in a user, creates a study space and quiz, submits an attempt and verifies the score.
-- `mongodb-memory-server` provides an isolated database for the integration test, so no local test database is required.
+- Gemini adapter, AI access, assistant chat and rate-limit tests; the Gemini SDK is mocked and no real API calls are made.
+- `mongodb-memory-server` provides an isolated database for integration tests, so no local test database is required.
 
 Other backend checks:
 
@@ -278,7 +291,17 @@ Authorization: Bearer <token>
 | GET    | `/attention`                   | Missed sessions and approaching exams with fixes  |
 | POST   | `/attention/:itemId/apply`     | Apply a reschedule suggestion (`next-free-slot` or `weekend`) |
 | POST   | `/assistant/command`           | Interpret a natural-language planning command     |
+| POST   | `/assistant/chat`              | Ask Gemini using selected notes from your spaces  |
 | POST   | `/assistant/apply`             | Confirm and apply a proposed move of study work    |
+
+### AI access
+
+| Method | Endpoint                     | Description                                      |
+| ------ | ---------------------------- | ------------------------------------------------ |
+| GET    | `/ai-access/status`          | Get the signed-in account's AI access state      |
+| GET    | `/ai-access/grants`          | List invites (admin only)                        |
+| POST   | `/ai-access/grants`          | Invite an email address (admin only)             |
+| DELETE | `/ai-access/grants/:id`      | Revoke an invitation or access (admin only)      |
 
 ### Bookmarks, search and sharing
 

@@ -1,12 +1,22 @@
 import apiClient from './client';
 import {
   AppliedChange,
+  AssistantChatInput,
+  AssistantChatResult,
   AssistantProposal,
   ExamPlan,
   RescheduleStrategyName,
 } from './types';
 
 export const assistantApi = {
+  async chat(input: AssistantChatInput): Promise<AssistantChatResult> {
+    const { data } = await apiClient.post<{ result: AssistantChatResult }>(
+      '/assistant/chat',
+      input,
+    );
+    return data.result;
+  },
+
   async command(text: string): Promise<AssistantProposal> {
     const { data } = await apiClient.post<{ proposal: AssistantProposal }>(
       '/assistant/command',

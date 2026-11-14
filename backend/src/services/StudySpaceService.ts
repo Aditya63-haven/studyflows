@@ -1,6 +1,9 @@
 import { ForbiddenError, NotFoundError } from '../errors';
 import { StudySpace } from '../domain/entities/StudySpace';
+import { IDocumentStorage } from '../domain/interfaces/IDocumentStorage';
 import { BookmarkRepository } from '../repositories/BookmarkRepository';
+import { DocumentChunkRepository } from '../repositories/DocumentChunkRepository';
+import { StudyDocumentRepository } from '../repositories/StudyDocumentRepository';
 import { FlashcardDeckRepository } from '../repositories/FlashcardDeckRepository';
 import { NoteRepository } from '../repositories/NoteRepository';
 import { QuizAttemptRepository } from '../repositories/QuizAttemptRepository';
@@ -32,6 +35,9 @@ export class StudySpaceService {
     private readonly attemptRepository: QuizAttemptRepository,
     private readonly bookmarkRepository: BookmarkRepository,
     private readonly sharedLinkRepository: SharedLinkRepository,
+    private readonly documentRepository: StudyDocumentRepository,
+    private readonly documentChunkRepository: DocumentChunkRepository,
+    private readonly documentStorage: IDocumentStorage,
   ) {}
 
   public async create(ownerId: string, input: CreateStudySpaceInput): Promise<StudySpace> {
@@ -88,10 +94,11 @@ export class StudySpaceService {
 
   public async delete(ownerId: string, spaceId: string): Promise<void> {
     await this.getOwned(ownerId, spaceId);
-    const [notes, quizzes, decks] = await Promise.all([
+    const [notes, quizzes, decks, documents] = await Promise.all([
       this.noteRepository.findBySpace(spaceId),
       this.quizRepository.findBySpace(spaceId),
       this.deckRepository.findBySpace(spaceId),
+      this.documentRepository.findBySpace(spaceId),
     ]);
 
     const noteIds = notes.map((note) => note.getId());
@@ -104,10 +111,15 @@ export class StudySpaceService {
       ...deckIds.map((deckId) => this.bookmarkRepository.deleteByItem(deckId, 'flashcarddeck')),
     ];
 
+    await Promise.all(
+      documents.map((document) => this.documentStorage.delete(document.getStorageKey())),
+    );
     await Promise.all([
       this.noteRepository.deleteBySpace(spaceId),
       this.quizRepository.deleteBySpace(spaceId),
       this.deckRepository.deleteBySpace(spaceId),
+      this.documentChunkRepository.deleteBySpace(spaceId),
+      this.documentRepository.deleteBySpace(spaceId),
       ...quizIds.map((quizId) => this.attemptRepository.deleteByQuiz(quizId)),
       ...bookmarkCleanups,
       ...noteIds.map((noteId) => this.sharedLinkRepository.deleteByItem(noteId, 'note')),

@@ -8,6 +8,7 @@ interface SidebarLink {
 
 const mainLinks: SidebarLink[] = [
   { to: '/dashboard', label: 'Dashboard', end: true },
+  { to: '/assistant', label: 'AI assistant' },
   { to: '/exam-plans', label: 'Planner' },
   { to: '/spaces', label: 'Subjects' },
   { to: '/tasks', label: 'Tasks & assessments' },

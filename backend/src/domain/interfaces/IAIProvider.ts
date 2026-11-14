@@ -51,6 +51,37 @@ export interface AICommandInput {
 
 export type AICommandAction = 'move-work' | 'none';
 
+export type AIAnswerMode = 'answer' | 'explain' | 'summary' | 'detailed';
+
+export type AIConversationRole = 'user' | 'assistant';
+
+export interface AIConversationMessage {
+  role: AIConversationRole;
+  content: string;
+}
+
+export interface AIContextNote {
+  id: string;
+  title: string;
+  content: string;
+  tags: string[];
+}
+
+export interface AIChatInput {
+  message: string;
+  mode: AIAnswerMode;
+  spaceName: string;
+  spaceSubject: string;
+  notes: AIContextNote[];
+  history: AIConversationMessage[];
+}
+
+export interface AIChatResult {
+  answer: string;
+  citedNoteIds: string[];
+  usedExternalKnowledge: boolean;
+}
+
 /**
  * Structured understanding of a natural-language study command.
  */
@@ -75,4 +106,5 @@ export interface IAIProvider {
   summarizeNote(input: AINoteInput): Promise<string>;
   generateQuiz(input: AIQuizInput): Promise<AIGeneratedQuestion[]>;
   interpretCommand(input: AICommandInput): Promise<AICommandInterpretation>;
+  chat(input: AIChatInput): Promise<AIChatResult>;
 }

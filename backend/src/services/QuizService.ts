@@ -5,6 +5,8 @@ import { QuizAttempt } from '../domain/entities/QuizAttempt';
 import { QuizAnswer } from '../domain/interfaces/IGradable';
 import { QuestionFactory, QuestionFactoryInput } from '../patterns/factory/QuestionFactory';
 import { StudyFacade } from '../patterns/facade/StudyFacade';
+import { AiAccessService } from './AiAccessService';
+import { AiRateLimiter } from './AiRateLimiter';
 import { BookmarkRepository } from '../repositories/BookmarkRepository';
 import { NoteRepository } from '../repositories/NoteRepository';
 import { QuizAttemptRepository } from '../repositories/QuizAttemptRepository';
@@ -42,6 +44,8 @@ export class QuizService {
     private readonly studyFacade: StudyFacade,
     private readonly bookmarkRepository: BookmarkRepository,
     private readonly sharedLinkRepository: SharedLinkRepository,
+    private readonly aiAccessService: AiAccessService,
+    private readonly rateLimiter: AiRateLimiter,
   ) {}
 
   public async listBySpace(ownerId: string, spaceId: string): Promise<Quiz[]> {
@@ -129,6 +133,8 @@ export class QuizService {
 
   public async generateFromNote(ownerId: string, noteId: string): Promise<Quiz> {
     const note = await this.findOwnedNote(ownerId, noteId);
+    await this.aiAccessService.assertAccess(ownerId);
+    this.rateLimiter.consume(ownerId);
     const quiz = await this.studyFacade.generateQuizFromNote(note);
     return this.quizRepository.create(quiz);
   }

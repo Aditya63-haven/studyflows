@@ -18,6 +18,7 @@ import {
   type AvailabilityWindow,
   type DayPlanMode,
 } from '../availability/availabilityApi';
+import { parseNumericInput } from '../utils/numericInput';
 
 const timezone = (): string => {
   try {
@@ -29,7 +30,7 @@ const timezone = (): string => {
 
 interface DayForm {
   mode: DayPlanMode;
-  budgetMinutes: number;
+  budgetMinutes: string;
   windows: AvailabilityWindow[];
   unavailable: boolean;
 }
@@ -38,8 +39,10 @@ export const AvailabilityPage = () => {
   const { week, loading, saveDay, preferences, savePreferences } = useAvailability();
   const [selectedDay, setSelectedDay] = useState(currentDayIndex());
   const [form, setForm] = useState<DayForm | null>(null);
-  const [sessionLength, setSessionLength] = useState(preferences.sessionLengthMinutes);
-  const [breakLength, setBreakLength] = useState(preferences.breakLengthMinutes);
+  const [sessionLength, setSessionLength] = useState(
+    String(preferences.sessionLengthMinutes),
+  );
+  const [breakLength, setBreakLength] = useState(String(preferences.breakLengthMinutes));
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -47,8 +50,8 @@ export const AvailabilityPage = () => {
     if (loading) {
       return;
     }
-    setSessionLength(preferences.sessionLengthMinutes);
-    setBreakLength(preferences.breakLengthMinutes);
+    setSessionLength(String(preferences.sessionLengthMinutes));
+    setBreakLength(String(preferences.breakLengthMinutes));
   }, [loading, preferences.sessionLengthMinutes, preferences.breakLengthMinutes]);
 
   useEffect(() => {
@@ -58,7 +61,7 @@ export const AvailabilityPage = () => {
     const day = week[selectedDay];
     setForm({
       mode: day.mode,
-      budgetMinutes: day.budgetMinutes,
+      budgetMinutes: String(day.budgetMinutes),
       windows: day.windows.map((window) => ({ ...window })),
       unavailable: day.unavailable,
     });
@@ -79,7 +82,7 @@ export const AvailabilityPage = () => {
     return total + (end > start ? end - start : 0);
   }, 0);
 
-  const budget = form.budgetMinutes;
+  const budget = parseNumericInput(form.budgetMinutes) ?? 0;
   const flexible = Math.max(0, budget - exactMinutes);
 
   const updateWindow = (id: string, start: string, end: string) => {
@@ -120,14 +123,19 @@ export const AvailabilityPage = () => {
         return;
       }
     }
-    if (form.budgetMinutes < 0 || form.budgetMinutes > 1440) {
+    const budgetMinutes = parseNumericInput(form.budgetMinutes);
+    if (budgetMinutes === null) {
+      setError('Enter a study budget.');
+      return;
+    }
+    if (budgetMinutes < 0 || budgetMinutes > 1440) {
       setError('The study budget must be between 0 and 1440 minutes.');
       return;
     }
     try {
       await saveDay(selectedDay, {
         mode: form.mode,
-        budgetMinutes: form.budgetMinutes,
+        budgetMinutes,
         windows: form.windows,
         unavailable: form.unavailable,
       });
@@ -139,16 +147,27 @@ export const AvailabilityPage = () => {
 
   const toggleUnavailable = async () => {
     setError(null);
+    const budgetMinutes = parseNumericInput(form.budgetMinutes);
+    if (budgetMinutes === null || budgetMinutes < 0 || budgetMinutes > 1440) {
+      setError('The study budget must be between 0 and 1440 minutes.');
+      return;
+    }
     try {
-      const next = {
+      setForm({
+        ...currentForm,
+        unavailable: !form.unavailable,
+      });
+      await saveDay(selectedDay, {
         mode: form.mode,
-        budgetMinutes: form.budgetMinutes,
+        budgetMinutes,
         windows: form.windows,
         unavailable: !form.unavailable,
-      };
-      setForm(next);
-      await saveDay(selectedDay, next);
-      setToast(next.unavailable ? `${weekday} marked unavailable.` : `${weekday} is available again.`);
+      });
+      setToast(
+        !form.unavailable
+          ? `${weekday} marked unavailable.`
+          : `${weekday} is available again.`,
+      );
     } catch {
       setError('Could not update this day. Please try again.');
     }
@@ -156,12 +175,23 @@ export const AvailabilityPage = () => {
 
   const handlePreferences = async () => {
     setError(null);
-    if (sessionLength < 5 || sessionLength > 240 || breakLength < 0 || breakLength > 60) {
+    const sessionLengthMinutes = parseNumericInput(sessionLength);
+    const breakLengthMinutes = parseNumericInput(breakLength);
+    if (sessionLengthMinutes === null || breakLengthMinutes === null) {
+      setError('Enter a session length and break length.');
+      return;
+    }
+    if (
+      sessionLengthMinutes < 5 ||
+      sessionLengthMinutes > 240 ||
+      breakLengthMinutes < 0 ||
+      breakLengthMinutes > 60
+    ) {
       setError('Session length must be 5-240 minutes and breaks 0-60 minutes.');
       return;
     }
     try {
-      await savePreferences({ sessionLengthMinutes: sessionLength, breakLengthMinutes: breakLength });
+      await savePreferences({ sessionLengthMinutes, breakLengthMinutes });
       setToast('Session preferences saved.');
     } catch {
       setError('Could not save preferences. Please try again.');
@@ -226,7 +256,7 @@ export const AvailabilityPage = () => {
                 onChange={(event) =>
                   setForm({
                     ...currentForm,
-                    budgetMinutes: Number(event.target.value),
+                    budgetMinutes: event.target.value,
                   })
                 }
                 required
@@ -323,7 +353,7 @@ export const AvailabilityPage = () => {
                   max={240}
                   step={5}
                   value={sessionLength}
-                  onChange={(event) => setSessionLength(Number(event.target.value))}
+                  onChange={(event) => setSessionLength(event.target.value)}
                   required
                 />
               </label>
@@ -336,7 +366,7 @@ export const AvailabilityPage = () => {
                   max={60}
                   step={5}
                   value={breakLength}
-                  onChange={(event) => setBreakLength(Number(event.target.value))}
+                  onChange={(event) => setBreakLength(event.target.value)}
                   required
                 />
               </label>

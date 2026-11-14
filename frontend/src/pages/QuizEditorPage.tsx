@@ -10,13 +10,14 @@ import type {
 import { ErrorBanner, Notice } from '../components/ErrorBanner';
 import { Loading } from '../components/Loading';
 import { PageHeader } from '../components/PageHeader';
+import { parseNumericInput } from '../utils/numericInput';
 
 interface QuestionDraft {
   key: string;
   id?: string;
   type: QuestionType;
   prompt: string;
-  points: number;
+  points: string;
   explanation: string;
   options: QuestionOption[];
   correctOptionId: string;
@@ -39,7 +40,7 @@ const createDraft = (type: QuestionType): QuestionDraft => {
     key: newKey(),
     type,
     prompt: '',
-    points: 1,
+    points: '1',
     explanation: '',
     options,
     correctOptionId: options[0]?.id ?? '',
@@ -55,7 +56,7 @@ const toDraft = (question: Quiz['questions'][number]): QuestionDraft => {
     id: question.id,
     type: question.type,
     prompt: question.prompt,
-    points: question.points,
+    points: String(question.points),
     explanation: question.explanation ?? '',
     options,
     correctOptionId: question.correctOptionId ?? options[0]?.id ?? '',
@@ -65,11 +66,12 @@ const toDraft = (question: Quiz['questions'][number]): QuestionDraft => {
 };
 
 const toInput = (draft: QuestionDraft): QuestionInput => {
+  const points = parseNumericInput(draft.points);
   const base: QuestionInput = {
     id: draft.id,
     type: draft.type,
     prompt: draft.prompt,
-    points: draft.points,
+    ...(points !== null ? { points } : {}),
     explanation: draft.explanation.trim() || undefined,
   };
 
@@ -384,7 +386,7 @@ export const QuizEditorPage = () => {
                   value={question.points}
                   onChange={(event) =>
                     updateQuestion(question.key, {
-                      points: Number(event.target.value),
+                      points: event.target.value,
                     })
                   }
                 />

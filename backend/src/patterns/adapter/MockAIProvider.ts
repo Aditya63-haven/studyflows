@@ -2,6 +2,8 @@ import {
   AICommandInput,
   AICommandInterpretation,
   AICommandPlanSummary,
+  AIChatInput,
+  AIChatResult,
   AIGeneratedQuestion,
   AINoteInput,
   AIQuizInput,
@@ -83,6 +85,62 @@ export class MockAIProvider implements IAIProvider {
    * Deterministic keyword rules: recognizes "move unfinished <subject> work
    * to the weekend / next free slot" style commands.
    */
+  /**
+   * Deterministic note-grounded answers used by tests and local development.
+   */
+  public async chat(input: AIChatInput): Promise<AIChatResult> {
+    const keywords = MockAIProvider.extractKeywords(input.message, 12);
+    const ranked = input.notes
+      .map((note) => ({
+        note,
+        score: MockAIProvider.scoreNote(note.title, note.content, keywords),
+      }))
+      .filter((entry) => entry.score > 0)
+      .sort((left, right) => right.score - left.score)
+      .slice(0, 3);
+
+    if (ranked.length === 0) {
+      return {
+        answer:
+          "I couldn't find a matching note in the selected study context. Select or add a relevant note for a grounded answer, or ask a broader question about the material you have included.",
+        citedNoteIds: [],
+        usedExternalKnowledge: false,
+      };
+    }
+
+    const citations = ranked.map(({ note }) => note.id);
+    const snippets = ranked.map(({ note }) => {
+      const sentences = MockAIProvider.extractSentences(note.content);
+      const relevant = sentences.find((sentence) =>
+        keywords.some((keyword) => sentence.toLowerCase().includes(keyword)),
+      );
+      const fallback = sentences.slice(0, 2).join(' ') || note.content;
+      return {
+        title: note.title,
+        text: MockAIProvider.truncate(relevant ?? fallback, 320),
+      };
+    });
+
+    const opening =
+      input.mode === 'summary'
+        ? `Here is a concise summary from ${input.spaceName}:`
+        : input.mode === 'explain'
+          ? 'Here is an explanation grounded in your selected notes:'
+          : input.mode === 'detailed'
+            ? 'Here is a detailed answer drawn from your selected notes:'
+            : 'Based on your selected notes:';
+
+    const body = snippets
+      .map((snippet) => `- **${snippet.title}**: ${snippet.text}`)
+      .join('\n');
+
+    return {
+      answer: `${opening}\n\n${body}`,
+      citedNoteIds: citations,
+      usedExternalKnowledge: false,
+    };
+  }
+
   public async interpretCommand(
     input: AICommandInput,
   ): Promise<AICommandInterpretation> {
@@ -283,6 +341,19 @@ export class MockAIProvider implements IAIProvider {
     }
 
     return questions;
+  }
+
+  private static scoreNote(title: string, content: string, keywords: string[]): number {
+    if (keywords.length === 0) {
+      return 0;
+    }
+    const normalizedTitle = title.toLowerCase();
+    const normalizedContent = content.toLowerCase();
+    return keywords.reduce((score, keyword) => {
+      const titleMatch = normalizedTitle.includes(keyword) ? 4 : 0;
+      const contentMatches = normalizedContent.split(keyword).length - 1;
+      return score + titleMatch + Math.min(contentMatches, 3);
+    }, 0);
   }
 
   private static extractSentences(content: string): string[] {

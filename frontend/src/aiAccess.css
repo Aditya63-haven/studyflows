@@ -1,0 +1,79 @@
+.ai-access-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.ai-access-settings > p {
+  margin: 0;
+}
+
+.ai-access-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.7rem;
+}
+
+.ai-access-form .field {
+  margin: 0;
+}
+
+.ai-access-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+
+.ai-access-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0.85rem;
+  align-items: center;
+  padding: 0.7rem 0.8rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.ai-access-row:last-child {
+  border-bottom: 0;
+}
+
+.ai-access-identity {
+  min-width: 0;
+}
+
+.ai-access-identity strong,
+.ai-access-identity small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-access-identity strong {
+  font-size: 0.86rem;
+}
+
+.ai-access-identity small {
+  margin-top: 0.15rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+@media (max-width: 640px) {
+  .ai-access-form {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ai-access-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .ai-access-row .button,
+  .ai-access-row > .small-text {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}

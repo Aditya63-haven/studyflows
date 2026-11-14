@@ -2,6 +2,8 @@ import { AppError } from '../../errors';
 import {
   AICommandInput,
   AICommandInterpretation,
+  AIChatInput,
+  AIChatResult,
   AIGeneratedQuestion,
   AINoteInput,
   AIQuizInput,
@@ -52,6 +54,25 @@ export class ExternalAIProvider implements IAIProvider {
       );
     }
     return response.questions;
+  }
+
+  public async chat(input: AIChatInput): Promise<AIChatResult> {
+    const response = await this.post<Partial<AIChatResult>>('/chat', input);
+    if (
+      typeof response.answer !== 'string' ||
+      response.answer.trim().length === 0 ||
+      !Array.isArray(response.citedNoteIds) ||
+      typeof response.usedExternalKnowledge !== 'boolean'
+    ) {
+      throw new AppError('External AI provider returned an invalid chat response', 502, false);
+    }
+    return {
+      answer: response.answer,
+      citedNoteIds: response.citedNoteIds.filter(
+        (id): id is string => typeof id === 'string',
+      ),
+      usedExternalKnowledge: response.usedExternalKnowledge,
+    };
   }
 
   public async interpretCommand(

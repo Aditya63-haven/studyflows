@@ -1,6 +1,9 @@
 import { Request, Response } from 'express';
 import { asyncHandler } from '../middleware/asyncHandler';
-import { AssistantService } from '../services/AssistantService';
+import {
+  AssistantChatInput,
+  AssistantService,
+} from '../services/AssistantService';
 import { authContext } from '../utils/authContext';
 import { Serializer } from '../utils/serializers';
 
@@ -9,6 +12,15 @@ import { Serializer } from '../utils/serializers';
  */
 export class AssistantController {
   constructor(private readonly assistantService: AssistantService) {}
+
+  public chat = asyncHandler(async (req: Request, res: Response) => {
+    const { userId } = authContext(req);
+    const result = await this.assistantService.chat(
+      userId,
+      req.body as AssistantChatInput,
+    );
+    res.status(200).json({ result });
+  });
 
   public command = asyncHandler(async (req: Request, res: Response) => {
     const { userId } = authContext(req);

@@ -1,12 +1,18 @@
+import { Config } from '../config/Config';
 import { NotFoundError } from '../errors';
 import { ExamPlan } from '../domain/entities/ExamPlan';
 import {
+  AIAnswerMode,
+  AIConversationMessage,
   AICommandPlanSummary,
   IAIProvider,
 } from '../domain/interfaces/IAIProvider';
 import { RescheduleStrategyName } from '../domain/interfaces/IRescheduleStrategy';
 import { AppliedChange, AttentionSuggestionView } from './AttentionService';
 import { AttentionService } from './AttentionService';
+import { AiAccessService } from './AiAccessService';
+import { AiRateLimiter } from './AiRateLimiter';
+import { AssistantContextBuilder } from './AssistantContextBuilder';
 import { ExamPlanRepository } from '../repositories/ExamPlanRepository';
 import { StudySpaceRepository } from '../repositories/StudySpaceRepository';
 
@@ -19,6 +25,27 @@ export interface AssistantProposal {
   strategy: RescheduleStrategyName | null;
   suggestion: AttentionSuggestionView | null;
   needsConfirmation: boolean;
+}
+
+export interface AssistantChatInput {
+  message: string;
+  mode: AIAnswerMode;
+  spaceId?: string | null;
+  noteIds?: string[];
+  history: AIConversationMessage[];
+}
+
+export interface AssistantCitation {
+  id: string;
+  title: string;
+}
+
+export interface AssistantChatResponse {
+  answer: string;
+  provider: string;
+  citations: AssistantCitation[];
+  usedExternalKnowledge: boolean;
+  noteCount: number;
 }
 
 /**
@@ -34,7 +61,54 @@ export class AssistantService {
     private readonly planRepository: ExamPlanRepository,
     private readonly spaceRepository: StudySpaceRepository,
     private readonly attentionService: AttentionService,
+    private readonly aiAccessService: AiAccessService,
+    private readonly contextBuilder: AssistantContextBuilder,
+    private readonly rateLimiter: AiRateLimiter,
+    private readonly config: Config,
   ) {}
+
+  /**
+   * Answers a study question using only the selected, owned notes as grounded
+   * context.
+   */
+  public async chat(
+    userId: string,
+    input: AssistantChatInput,
+  ): Promise<AssistantChatResponse> {
+    await this.aiAccessService.assertAccess(userId);
+    this.rateLimiter.consume(userId);
+
+    const context = await this.contextBuilder.build(
+      userId,
+      input.spaceId,
+      input.noteIds,
+    );
+    const result = await this.aiProvider.chat({
+      message: input.message,
+      mode: input.mode,
+      spaceName: context.spaceName,
+      spaceSubject: context.spaceSubject,
+      notes: context.notes,
+      history: input.history.slice(-this.config.aiMaxHistoryMessages),
+    });
+
+    const notesById = new Map(context.notes.map((note) => [note.id, note]));
+    const citations: AssistantCitation[] = [];
+    for (const noteId of new Set(result.citedNoteIds)) {
+      const note = notesById.get(noteId);
+      if (note) {
+        citations.push({ id: note.id, title: note.title });
+      }
+    }
+
+    return {
+      answer: result.answer,
+      provider: this.aiProvider.name,
+      citations,
+      usedExternalKnowledge: result.usedExternalKnowledge,
+      noteCount: context.notes.length,
+    };
+  }
 
   /**
    * Parses a command and returns a proposal the user must confirm before any
@@ -45,6 +119,9 @@ export class AssistantService {
     text: string,
     now: Date = new Date(),
   ): Promise<AssistantProposal> {
+    await this.aiAccessService.assertAccess(userId);
+    this.rateLimiter.consume(userId);
+
     const [plans, spaces] = await Promise.all([
       this.planRepository.findByOwner(userId),
       this.spaceRepository.findByOwner(userId),

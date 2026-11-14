@@ -13,5 +13,6 @@ export { sharingApi } from './sharing';
 export { notificationsApi } from './notifications';
 export { attentionApi } from './attention';
 export { assistantApi } from './assistant';
+export { aiAccessApi } from './aiAccess';
 export { getErrorMessage, resolveApiAssetUrl, TOKEN_STORAGE_KEY } from './client';
 export type * from './types';

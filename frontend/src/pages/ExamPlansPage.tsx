@@ -8,19 +8,20 @@ import { Loading } from '../components/Loading';
 import { PageHeader } from '../components/PageHeader';
 import { ProgressBar } from '../components/ProgressBar';
 import { formatDate } from '../utils/format';
+import { parseNumericInput } from '../utils/numericInput';
 
 interface TopicDraft {
   key: string;
   name: string;
   description: string;
-  estimatedMinutes: number;
+  estimatedMinutes: string;
 }
 
 const createTopic = (): TopicDraft => ({
   key: crypto.randomUUID(),
   name: '',
   description: '',
-  estimatedMinutes: 45,
+  estimatedMinutes: '45',
 });
 
 export const ExamPlansPage = () => {
@@ -31,7 +32,7 @@ export const ExamPlansPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [examDate, setExamDate] = useState('');
-  const [dailyStudyHours, setDailyStudyHours] = useState(2);
+  const [dailyStudyHours, setDailyStudyHours] = useState('2');
   const [topics, setTopics] = useState<TopicDraft[]>([createTopic()]);
 
   useEffect(() => {
@@ -78,17 +79,39 @@ export const ExamPlansPage = () => {
       return;
     }
 
-    setSaving(true);
-    try {
-      const topicInputs: ExamTopicInput[] = topics.map((topic) => ({
+    const hours = parseNumericInput(dailyStudyHours);
+    if (hours === null) {
+      setError('Enter daily study hours.');
+      return;
+    }
+    if (hours < 0.5 || hours > 24) {
+      setError('Daily study hours must be between 0.5 and 24.');
+      return;
+    }
+
+    const topicInputs: ExamTopicInput[] = [];
+    for (const [index, topic] of topics.entries()) {
+      const estimatedMinutes = parseNumericInput(topic.estimatedMinutes);
+      if (
+        estimatedMinutes !== null &&
+        (!Number.isInteger(estimatedMinutes) || estimatedMinutes < 1 || estimatedMinutes > 1440)
+      ) {
+        setError(`Topic ${index + 1} minutes must be between 1 and 1440.`);
+        return;
+      }
+      topicInputs.push({
         name: topic.name,
         description: topic.description || undefined,
-        estimatedMinutes: topic.estimatedMinutes,
-      }));
+        ...(estimatedMinutes !== null ? { estimatedMinutes } : {}),
+      });
+    }
+
+    setSaving(true);
+    try {
       const plan = await examPlansApi.create({
         name,
         examDate: new Date(`${examDate}T00:00:00`).toISOString(),
-        dailyStudyHours,
+        dailyStudyHours: hours,
         topics: topicInputs,
       });
       navigate(`/exam-plans/${plan.id}`);
@@ -151,7 +174,7 @@ export const ExamPlansPage = () => {
                 max={24}
                 step={0.5}
                 value={dailyStudyHours}
-                onChange={(event) => setDailyStudyHours(Number(event.target.value))}
+                onChange={(event) => setDailyStudyHours(event.target.value)}
                 required
               />
             </label>
@@ -200,7 +223,7 @@ export const ExamPlansPage = () => {
                   max={1440}
                   value={topic.estimatedMinutes}
                   onChange={(event) =>
-                    updateTopic(topic.key, { estimatedMinutes: Number(event.target.value) })
+                    updateTopic(topic.key, { estimatedMinutes: event.target.value })
                   }
                 />
               </label>

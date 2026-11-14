@@ -72,6 +72,7 @@ describe('API smoke test', () => {
     process.env.NODE_ENV = 'test';
     process.env.JWT_SECRET = 'integration-test-secret';
     process.env.AI_PROVIDER = 'mock';
+    process.env.AI_ACCESS_ADMIN_EMAIL = 'smoke@example.com';
     process.env.REVISION_STRATEGY = 'sm2';
 
     mongo = await MongoMemoryServer.create();
@@ -241,6 +242,12 @@ describe('API smoke test', () => {
       })
       .expect(201);
     otherToken = other.body.token;
+
+    await request(app)
+      .post('/api/ai-access/grants')
+      .set(auth(token))
+      .send({ email: 'smoke2@example.com' })
+      .expect(201);
 
     await request(app).get(`/api/spaces/${spaceId}`).set(auth(otherToken)).expect(403);
 

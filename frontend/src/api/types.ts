@@ -395,3 +395,51 @@ export interface AssistantProposal {
   suggestion: AttentionSuggestion | null;
   needsConfirmation: boolean;
 }
+
+export type AiAccessUserStatus = 'admin' | 'active' | 'revoked' | 'none';
+export type AiAccessGrantStatus = 'pending' | 'registered' | 'revoked';
+
+export interface AiAccessStatus {
+  allowed: boolean;
+  isAdmin: boolean;
+  email: string;
+  status: AiAccessUserStatus;
+}
+
+export interface AiAccessGrant {
+  id: string;
+  email: string;
+  status: AiAccessGrantStatus;
+  invitedBy: string;
+  revokedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type AssistantChatMode = 'answer' | 'explain' | 'summary' | 'detailed';
+
+export interface AssistantConversationMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface AssistantChatInput {
+  message: string;
+  mode: AssistantChatMode;
+  spaceId: string | null;
+  noteIds: string[];
+  history: AssistantConversationMessage[];
+}
+
+export interface AssistantCitation {
+  id: string;
+  title: string;
+}
+
+export interface AssistantChatResult {
+  answer: string;
+  provider: string;
+  citations: AssistantCitation[];
+  usedExternalKnowledge: boolean;
+  noteCount: number;
+}

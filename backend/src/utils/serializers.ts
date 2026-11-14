@@ -12,6 +12,7 @@ import { QuizAttempt } from '../domain/entities/QuizAttempt';
 import { RevisionSchedule } from '../domain/entities/RevisionSchedule';
 import { SharedLink } from '../domain/entities/SharedLink';
 import { StudentAvailability } from '../domain/entities/StudentAvailability';
+import { StudyDocument } from '../domain/entities/StudyDocument';
 import { StudySession } from '../domain/entities/StudySession';
 import { StudySpace } from '../domain/entities/StudySpace';
 import { User } from '../domain/entities/User';
@@ -63,6 +64,25 @@ export class Serializer {
       shareToken: note.getShareToken(),
       createdAt: note.getCreatedAt(),
       updatedAt: note.getUpdatedAt(),
+    };
+  }
+
+  public static document(document: StudyDocument) {
+    return {
+      id: document.getId(),
+      type: 'document',
+      spaceId: document.getSpaceId(),
+      originalName: document.getOriginalName(),
+      format: document.getFormat(),
+      mimeType: document.getMimeType(),
+      sizeBytes: document.getSizeBytes(),
+      status: document.getStatus(),
+      errorMessage: document.getErrorMessage(),
+      pageCount: document.getPageCount(),
+      characterCount: document.getCharacterCount(),
+      chunkCount: document.getChunkCount(),
+      createdAt: document.getCreatedAt(),
+      updatedAt: document.getUpdatedAt(),
     };
   }
 

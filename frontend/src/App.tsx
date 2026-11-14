@@ -2,6 +2,7 @@ import { Route, Routes } from 'react-router-dom';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { Layout } from './components/Layout';
 import { AnalyticsPage } from './pages/AnalyticsPage';
+import { AssistantPage } from './pages/AssistantPage';
 import { AvailabilityPage } from './pages/AvailabilityPage';
 import { BookmarksPage } from './pages/BookmarksPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -40,6 +41,7 @@ export const App = () => (
     <Route element={<ProtectedRoute />}>
       <Route element={<Layout />}>
         <Route path="dashboard" element={<DashboardPage />} />
+        <Route path="assistant" element={<AssistantPage />} />
         <Route path="spaces" element={<SpacesPage />} />
         <Route path="spaces/:spaceId" element={<SpaceDetailPage />} />
         <Route path="spaces/:spaceId/notes/new" element={<NoteEditorPage />} />

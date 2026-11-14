@@ -1,6 +1,8 @@
 import { ForbiddenError, NotFoundError } from '../errors';
 import { Note } from '../domain/entities/Note';
 import { StudyFacade } from '../patterns/facade/StudyFacade';
+import { AiAccessService } from './AiAccessService';
+import { AiRateLimiter } from './AiRateLimiter';
 import { BookmarkRepository } from '../repositories/BookmarkRepository';
 import { NoteRepository } from '../repositories/NoteRepository';
 import { SharedLinkRepository } from '../repositories/SharedLinkRepository';
@@ -31,6 +33,8 @@ export class NoteService {
     private readonly studyFacade: StudyFacade,
     private readonly bookmarkRepository: BookmarkRepository,
     private readonly sharedLinkRepository: SharedLinkRepository,
+    private readonly aiAccessService: AiAccessService,
+    private readonly rateLimiter: AiRateLimiter,
   ) {}
 
   public async listBySpace(ownerId: string, spaceId: string): Promise<Note[]> {
@@ -98,6 +102,8 @@ export class NoteService {
 
   public async condense(ownerId: string, noteId: string): Promise<Note> {
     const note = await this.getOwned(ownerId, noteId);
+    await this.aiAccessService.assertAccess(ownerId);
+    this.rateLimiter.consume(ownerId);
     await this.studyFacade.condenseNote(note);
     const updated = await this.noteRepository.update(noteId, note);
     if (!updated) {

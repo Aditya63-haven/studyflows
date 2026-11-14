@@ -2,8 +2,10 @@ import { resolve } from 'path';
 import dotenv from 'dotenv';
 
 export type NodeEnv = 'development' | 'test' | 'production';
-export type AIProviderName = 'mock' | 'external';
+export type AIProviderName = 'mock' | 'external' | 'gemini';
 export type RevisionStrategyName = 'sm2' | 'simple';
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
  * Application configuration loaded once from environment variables.
@@ -25,8 +27,26 @@ export class Config {
   private readonly _aiProvider: AIProviderName;
   private readonly _aiApiKey: string | undefined;
   private readonly _aiBaseUrl: string | undefined;
+  private readonly _aiModel: string;
+  private readonly _aiAccessAdminEmail: string | undefined;
+  private readonly _aiMaxInputChars: number;
+  private readonly _aiMaxOutputTokens: number;
+  private readonly _aiMaxContextChars: number;
+  private readonly _aiMaxNoteChars: number;
+  private readonly _aiMaxDocumentContextChars: number;
+  private readonly _aiMaxHistoryMessages: number;
+  private readonly _aiUserRequestsPerMinute: number;
+  private readonly _aiGlobalRequestsPerMinute: number;
+  private readonly _aiRequestTimeoutMs: number;
   private readonly _revisionStrategy: RevisionStrategyName;
   private readonly _avatarStorageDir: string;
+  private readonly _documentMaxBytes: number;
+  private readonly _documentMaxPages: number;
+  private readonly _documentMaxExtractedChars: number;
+  private readonly _documentChunkSize: number;
+  private readonly _documentChunkOverlap: number;
+  private readonly _documentMaxChunks: number;
+  private readonly _documentStorageDir: string;
 
   private constructor() {
     dotenv.config({ path: resolve(__dirname, '../../.env') });
@@ -40,8 +60,51 @@ export class Config {
     this._aiProvider = Config.parseAIProvider(process.env.AI_PROVIDER);
     this._aiApiKey = Config.optionalEnv('AI_API_KEY');
     this._aiBaseUrl = Config.optionalEnv('AI_BASE_URL');
+    this._aiModel = Config.optionalEnv('AI_MODEL') ?? 'gemini-3.8-flash';
+    this._aiAccessAdminEmail = Config.parseOptionalEmail(process.env.AI_ACCESS_ADMIN_EMAIL);
+    this._aiMaxInputChars = Config.parsePositiveInt('AI_MAX_INPUT_CHARS', 24_000);
+    this._aiMaxOutputTokens = Config.parsePositiveInt('AI_MAX_OUTPUT_TOKENS', 2_048);
+    this._aiMaxContextChars = Config.parsePositiveInt('AI_MAX_CONTEXT_CHARS', 12_000);
+    this._aiMaxNoteChars = Config.parsePositiveInt('AI_MAX_NOTE_CHARS', 4_000);
+    this._aiMaxDocumentContextChars = Config.parsePositiveInt(
+      'AI_MAX_DOCUMENT_CONTEXT_CHARS',
+      6_000,
+    );
+    this._aiMaxHistoryMessages = Config.parseNonNegativeInt('AI_MAX_HISTORY_MESSAGES', 12);
+    this._aiUserRequestsPerMinute = Config.parsePositiveInt('AI_USER_REQUESTS_PER_MINUTE', 12);
+    this._aiGlobalRequestsPerMinute = Config.parsePositiveInt(
+      'AI_GLOBAL_REQUESTS_PER_MINUTE',
+      60,
+    );
+    this._aiRequestTimeoutMs = Config.parsePositiveInt('AI_REQUEST_TIMEOUT_MS', 30_000);
+
+    if (this._aiMaxNoteChars > this._aiMaxContextChars) {
+      throw new Error('[Config] AI_MAX_NOTE_CHARS cannot exceed AI_MAX_CONTEXT_CHARS');
+    }
+    if (this._aiMaxDocumentContextChars > this._aiMaxContextChars) {
+      throw new Error(
+        '[Config] AI_MAX_DOCUMENT_CONTEXT_CHARS cannot exceed AI_MAX_CONTEXT_CHARS',
+      );
+    }
+
     this._revisionStrategy = Config.parseRevisionStrategy(process.env.REVISION_STRATEGY);
     this._avatarStorageDir = resolve(Config.optionalEnv('AVATAR_STORAGE_DIR') ?? 'storage/avatars');
+
+    this._documentMaxBytes = Config.parsePositiveInt('DOCUMENT_MAX_BYTES', 10 * 1024 * 1024);
+    this._documentMaxPages = Config.parsePositiveInt('DOCUMENT_MAX_PAGES', 300);
+    this._documentMaxExtractedChars = Config.parsePositiveInt(
+      'DOCUMENT_MAX_EXTRACTED_CHARS',
+      500_000,
+    );
+    this._documentChunkSize = Config.parsePositiveInt('DOCUMENT_CHUNK_SIZE', 1_200);
+    this._documentChunkOverlap = Config.parseNonNegativeInt('DOCUMENT_CHUNK_OVERLAP', 200);
+    if (this._documentChunkOverlap >= this._documentChunkSize) {
+      throw new Error('[Config] DOCUMENT_CHUNK_OVERLAP must be smaller than DOCUMENT_CHUNK_SIZE');
+    }
+    this._documentMaxChunks = Config.parsePositiveInt('DOCUMENT_MAX_CHUNKS', 2_000);
+    this._documentStorageDir = resolve(
+      Config.optionalEnv('DOCUMENT_STORAGE_DIR') ?? 'storage/documents',
+    );
   }
 
   /**
@@ -90,12 +153,84 @@ export class Config {
     return this._aiBaseUrl;
   }
 
+  public get aiModel(): string {
+    return this._aiModel;
+  }
+
+  public get aiAccessAdminEmail(): string | undefined {
+    return this._aiAccessAdminEmail;
+  }
+
+  public get aiMaxInputChars(): number {
+    return this._aiMaxInputChars;
+  }
+
+  public get aiMaxOutputTokens(): number {
+    return this._aiMaxOutputTokens;
+  }
+
+  public get aiMaxContextChars(): number {
+    return this._aiMaxContextChars;
+  }
+
+  public get aiMaxNoteChars(): number {
+    return this._aiMaxNoteChars;
+  }
+
+  public get aiMaxDocumentContextChars(): number {
+    return this._aiMaxDocumentContextChars;
+  }
+
+  public get aiMaxHistoryMessages(): number {
+    return this._aiMaxHistoryMessages;
+  }
+
+  public get aiUserRequestsPerMinute(): number {
+    return this._aiUserRequestsPerMinute;
+  }
+
+  public get aiGlobalRequestsPerMinute(): number {
+    return this._aiGlobalRequestsPerMinute;
+  }
+
+  public get aiRequestTimeoutMs(): number {
+    return this._aiRequestTimeoutMs;
+  }
+
   public get revisionStrategy(): RevisionStrategyName {
     return this._revisionStrategy;
   }
 
   public get avatarStorageDir(): string {
     return this._avatarStorageDir;
+  }
+
+  public get documentMaxBytes(): number {
+    return this._documentMaxBytes;
+  }
+
+  public get documentMaxPages(): number {
+    return this._documentMaxPages;
+  }
+
+  public get documentMaxExtractedChars(): number {
+    return this._documentMaxExtractedChars;
+  }
+
+  public get documentChunkSize(): number {
+    return this._documentChunkSize;
+  }
+
+  public get documentChunkOverlap(): number {
+    return this._documentChunkOverlap;
+  }
+
+  public get documentMaxChunks(): number {
+    return this._documentMaxChunks;
+  }
+
+  public get documentStorageDir(): string {
+    return this._documentStorageDir;
   }
 
   public get isProduction(): boolean {
@@ -133,12 +268,49 @@ export class Config {
     return port;
   }
 
+  private static parsePositiveInt(name: string, fallback: number): number {
+    const raw = Config.optionalEnv(name);
+    if (!raw) {
+      return fallback;
+    }
+    const value = Number(raw);
+    if (!Number.isInteger(value) || value < 1) {
+      throw new Error(`[Config] ${name} must be a positive integer (received "${raw}")`);
+    }
+    return value;
+  }
+
+  private static parseNonNegativeInt(name: string, fallback: number): number {
+    const raw = Config.optionalEnv(name);
+    if (!raw) {
+      return fallback;
+    }
+    const value = Number(raw);
+    if (!Number.isInteger(value) || value < 0) {
+      throw new Error(`[Config] ${name} must be a non-negative integer (received "${raw}")`);
+    }
+    return value;
+  }
+
+  private static parseOptionalEmail(value: string | undefined): string | undefined {
+    const email = value?.trim().toLowerCase();
+    if (!email) {
+      return undefined;
+    }
+    if (!EMAIL_PATTERN.test(email)) {
+      throw new Error('[Config] AI_ACCESS_ADMIN_EMAIL must be a valid email address');
+    }
+    return email;
+  }
+
   private static parseAIProvider(value: string | undefined): AIProviderName {
     const provider = (value ?? 'mock').trim().toLowerCase();
-    if (provider === 'mock' || provider === 'external') {
+    if (provider === 'mock' || provider === 'external' || provider === 'gemini') {
       return provider;
     }
-    throw new Error(`[Config] AI_PROVIDER must be "mock" or "external" (received "${provider}")`);
+    throw new Error(
+      `[Config] AI_PROVIDER must be "mock", "external" or "gemini" (received "${provider}")`,
+    );
   }
 
   private static parseRevisionStrategy(value: string | undefined): RevisionStrategyName {

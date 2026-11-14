@@ -208,6 +208,26 @@ export const assistantApplySchema = z.object({
   strategy: z.enum(['next-free-slot', 'weekend']),
 });
 
+export const assistantChatSchema = z.object({
+  message: z.string().trim().min(1).max(4000),
+  mode: z.enum(['answer', 'explain', 'summary', 'detailed']).default('answer'),
+  spaceId: z.string().trim().min(1).nullable().optional(),
+  noteIds: z.array(z.string().trim().min(1)).max(50).optional(),
+  history: z
+    .array(
+      z.object({
+        role: z.enum(['user', 'assistant']),
+        content: z.string().trim().min(1).max(4000),
+      }),
+    )
+    .max(20)
+    .default([]),
+});
+
+export const aiAccessGrantSchema = z.object({
+  email: z.string().trim().email(),
+});
+
 export const searchQuerySchema = z.object({
   q: z.string().trim().min(1).max(200),
 });
