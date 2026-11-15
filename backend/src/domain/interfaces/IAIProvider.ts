@@ -217,6 +217,65 @@ export interface AIPerformanceInterpretation {
   practiceSuggestions: AIPerformancePracticeSuggestion[];
 }
 
+export interface AIExamPreparationTopicInput {
+  topicId: string;
+  topicName: string;
+  estimatedMinutes: number;
+  completed: boolean;
+  performance: {
+    accuracy: number | null;
+    answeredQuestions: number;
+    classification: string;
+    evidence: string[];
+    trendDirection: string;
+  } | null;
+  revision: {
+    memoryStrength: number;
+    status: string;
+  } | null;
+}
+
+export interface AIExamPreparationSource {
+  chunkId: string;
+  documentTitle: string;
+  pageNumber: number | null;
+  section: string | null;
+  text: string;
+}
+
+export interface AIExamPreparationInput {
+  examName: string;
+  examDate: string;
+  daysRemaining: number;
+  subject: string;
+  spaceName: string;
+  dailyStudyHours: number;
+  availability: {
+    weeklyMinutes: number;
+    source: 'saved' | 'default';
+  };
+  dataQuality: {
+    reliable: boolean;
+    insufficientData: string[];
+    limitations: string[];
+  };
+  topics: AIExamPreparationTopicInput[];
+  sourceChunks: AIExamPreparationSource[];
+}
+
+export interface AIExamPreparationSequenceItem {
+  topicId: string;
+  reason: string;
+  practiceActivity: string;
+}
+
+export interface AIExamPreparationInterpretation {
+  summary: string;
+  sequence: AIExamPreparationSequenceItem[];
+  cautions: string[];
+  usedChunkIds: string[];
+}
+
 /**
  * Structured understanding of a natural-language study command.
  */
@@ -242,5 +301,8 @@ export interface IAIProvider {
   generateQuiz(input: AIQuizInput): Promise<AIGeneratedQuestion[]>;
   interpretCommand(input: AICommandInput): Promise<AICommandInterpretation>;
   interpretPerformance(input: AIPerformanceInput): Promise<AIPerformanceInterpretation>;
+  planExamPreparation(
+    input: AIExamPreparationInput,
+  ): Promise<AIExamPreparationInterpretation>;
   chat(input: AIChatInput): Promise<AIChatResult>;
 }

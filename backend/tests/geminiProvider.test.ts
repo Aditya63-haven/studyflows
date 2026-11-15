@@ -274,3 +274,120 @@ describe('GeminiAIProvider performance interpretation', () => {
     });
   });
 });
+
+const examPreparationInput = {
+  examName: 'Biology Final',
+  examDate: '2026-04-10T09:00:00.000Z',
+  daysRemaining: 20,
+  subject: 'Biology',
+  spaceName: 'Biology',
+  dailyStudyHours: 2,
+  availability: { weeklyMinutes: 840, source: 'saved' as const },
+  dataQuality: {
+    reliable: true,
+    insufficientData: [],
+    limitations: ['Quiz questions do not store curriculum topic tags.'],
+  },
+  topics: [
+    {
+      topicId: 'topic-1',
+      topicName: 'Cell Biology',
+      estimatedMinutes: 60,
+      completed: false,
+      performance: {
+        accuracy: 40,
+        answeredQuestions: 5,
+        classification: 'weak',
+        evidence: ['2/5 questions correct.'],
+        trendDirection: 'declining',
+      },
+      revision: null,
+    },
+    {
+      topicId: 'topic-2',
+      topicName: 'Genetics',
+      estimatedMinutes: 45,
+      completed: false,
+      performance: null,
+      revision: null,
+    },
+  ],
+  sourceChunks: [
+    {
+      chunkId: 'chunk-1',
+      documentTitle: 'syllabus.txt',
+      pageNumber: 1,
+      section: 'Cell Biology',
+      text: 'Cell Biology covers membranes and organelles.',
+    },
+  ],
+};
+
+describe('GeminiAIProvider exam preparation', () => {
+  it('parses and sanitizes exam preparation JSON', async () => {
+    const { provider, generateContent } = makeProvider();
+    generateContent.mockResolvedValue({
+      text: JSON.stringify({
+        summary: 'Start with the weak Cell Biology evidence.',
+        sequence: [
+          {
+            topicId: 'topic-1',
+            reason: 'Accuracy is low.',
+            practiceActivity: 'Answer practice questions.',
+          },
+          {
+            topicId: 'topic-1',
+            reason: 'Duplicate.',
+            practiceActivity: 'Duplicate.',
+          },
+          {
+            topicId: 'unknown-topic',
+            reason: 'Not in the plan.',
+            practiceActivity: 'Ignore this.',
+          },
+          {
+            topicId: 'topic-2',
+            reason: 'No evidence yet.',
+            practiceActivity: 'Build a concept map.',
+          },
+        ],
+        cautions: ['Limited quiz evidence.', 'Limited quiz evidence.'],
+        usedChunkIds: ['chunk-1', 'unknown-chunk'],
+      }),
+    });
+
+    const result = await provider.planExamPreparation(examPreparationInput);
+
+    expect(result.summary).toBe('Start with the weak Cell Biology evidence.');
+    expect(result.sequence).toEqual([
+      {
+        topicId: 'topic-1',
+        reason: 'Accuracy is low.',
+        practiceActivity: 'Answer practice questions.',
+      },
+      {
+        topicId: 'topic-2',
+        reason: 'No evidence yet.',
+        practiceActivity: 'Build a concept map.',
+      },
+    ]);
+    expect(result.cautions).toEqual(['Limited quiz evidence.']);
+    expect(result.usedChunkIds).toEqual(['chunk-1']);
+    expect(generateContent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        contents: expect.stringContaining('topic-1'),
+      }),
+    );
+  });
+
+  it('rejects invalid exam preparation payloads', async () => {
+    const { provider, generateContent } = makeProvider();
+    generateContent.mockResolvedValue({
+      text: JSON.stringify({ summary: '', sequence: [] }),
+    });
+
+    await expect(
+      provider.planExamPreparation(examPreparationInput),
+    ).rejects.toMatchObject({ name: 'AppError', statusCode: 502 });
+  });
+});

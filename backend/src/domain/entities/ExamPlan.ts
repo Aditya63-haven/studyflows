@@ -4,12 +4,24 @@ import {
   requireDate,
   requireNonEmpty,
   requireNumberInRange,
+  requireString,
   resolveId,
   roundTo,
   startOfDay,
+  uniqueIds,
 } from '../base/helpers';
 import { StudyDay } from './StudyDay';
 import { Topic } from './Topic';
+
+export interface ExamPreparationRecord {
+  provider: string;
+  strategySummary: string;
+  approvedAt: Date;
+  approvalFingerprint: string;
+  requiredMinutes: number;
+  scheduledMinutes: number;
+  shortfallMinutes: number;
+}
 
 export interface ExamPlanProps {
   id?: string;
@@ -19,6 +31,9 @@ export interface ExamPlanProps {
   dailyStudyHours: number;
   topics?: Topic[];
   studyDays?: StudyDay[];
+  spaceId?: string | null;
+  documentIds?: string[];
+  preparation?: ExamPreparationRecord | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -45,6 +60,9 @@ export class ExamPlan {
   private _dailyStudyHours: number;
   private _topics: Topic[];
   private _studyDays: StudyDay[];
+  private _spaceId: string | null;
+  private _documentIds: string[];
+  private _preparation: ExamPreparationRecord | null;
   private readonly _createdAt: Date;
   private _updatedAt: Date;
 
@@ -61,6 +79,9 @@ export class ExamPlan {
     );
     this._topics = [...(props.topics ?? [])];
     this._studyDays = [...(props.studyDays ?? [])];
+    this._spaceId = ExamPlan.normalizeOptionalId(props.spaceId, 'spaceId');
+    this._documentIds = uniqueIds(props.documentIds ?? []);
+    this._preparation = ExamPlan.normalizePreparation(props.preparation);
     this._createdAt = props.createdAt ? requireDate(props.createdAt, 'createdAt') : new Date();
     this._updatedAt = props.updatedAt ? requireDate(props.updatedAt, 'updatedAt') : new Date();
   }
@@ -97,6 +118,42 @@ export class ExamPlan {
 
   public setDailyStudyHours(hours: number): void {
     this._dailyStudyHours = requireNumberInRange(hours, 'dailyStudyHours', 0.5, 24);
+    this.touch();
+  }
+
+  public getSpaceId(): string | null {
+    return this._spaceId;
+  }
+
+  public setSpaceId(spaceId: string | null): void {
+    this._spaceId = ExamPlan.normalizeOptionalId(spaceId, 'spaceId');
+    this.touch();
+  }
+
+  public getDocumentIds(): string[] {
+    return [...this._documentIds];
+  }
+
+  public setDocumentIds(documentIds: string[]): void {
+    if (!Array.isArray(documentIds)) {
+      throw new ValidationError('documentIds must be an array');
+    }
+    this._documentIds = uniqueIds(documentIds);
+    this.touch();
+  }
+
+  public getPreparation(): ExamPreparationRecord | null {
+    if (!this._preparation) {
+      return null;
+    }
+    return {
+      ...this._preparation,
+      approvedAt: new Date(this._preparation.approvedAt.getTime()),
+    };
+  }
+
+  public setPreparation(preparation: ExamPreparationRecord | null): void {
+    this._preparation = ExamPlan.normalizePreparation(preparation);
     this.touch();
   }
 
@@ -324,5 +381,52 @@ export class ExamPlan {
 
   private touch(): void {
     this._updatedAt = new Date();
+  }
+
+  private static normalizeOptionalId(value: unknown, field: string): string | null {
+    if (value === undefined || value === null) {
+      return null;
+    }
+    return requireNonEmpty(value, field);
+  }
+
+  private static normalizePreparation(value: unknown): ExamPreparationRecord | null {
+    if (value === undefined || value === null) {
+      return null;
+    }
+    if (typeof value !== 'object') {
+      throw new ValidationError('preparation must be an object or null');
+    }
+    const record = value as Partial<ExamPreparationRecord>;
+    return {
+      provider: requireNonEmpty(record.provider, 'preparation.provider'),
+      strategySummary: requireString(
+        record.strategySummary ?? '',
+        'preparation.strategySummary',
+      ),
+      approvedAt: requireDate(record.approvedAt, 'preparation.approvedAt'),
+      approvalFingerprint: requireNonEmpty(
+        record.approvalFingerprint,
+        'preparation.approvalFingerprint',
+      ),
+      requiredMinutes: requireNumberInRange(
+        record.requiredMinutes,
+        'preparation.requiredMinutes',
+        0,
+        1_000_000,
+      ),
+      scheduledMinutes: requireNumberInRange(
+        record.scheduledMinutes,
+        'preparation.scheduledMinutes',
+        0,
+        1_000_000,
+      ),
+      shortfallMinutes: requireNumberInRange(
+        record.shortfallMinutes,
+        'preparation.shortfallMinutes',
+        0,
+        1_000_000,
+      ),
+    };
   }
 }

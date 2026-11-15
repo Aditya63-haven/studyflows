@@ -7,6 +7,9 @@ import {
   AIGeneratedQuestion,
   AINoteInput,
   AIQuizInput,
+  AIExamPreparationInput,
+  AIExamPreparationInterpretation,
+  AIExamPreparationSequenceItem,
   AIPerformanceInput,
   AIPerformanceInterpretation,
   IAIProvider,
@@ -262,6 +265,104 @@ export class MockAIProvider implements IAIProvider {
       trendInterpretation,
       focusTopicIds,
       practiceSuggestions,
+    };
+  }
+
+  public async planExamPreparation(
+    input: AIExamPreparationInput,
+  ): Promise<AIExamPreparationInterpretation> {
+    const remaining = input.topics.filter((topic) => !topic.completed);
+    if (remaining.length === 0) {
+      return {
+        summary: `All topics for ${input.examName} are already complete. Use the remaining time for retrieval practice and past papers.`,
+        sequence: [],
+        cautions: ['No unfinished topics were supplied, so no study sequence was generated.'],
+        usedChunkIds: [],
+      };
+    }
+
+    const rank = (topic: AIExamPreparationInput['topics'][number]): number => {
+      if (topic.performance?.classification === 'weak') {
+        return 0;
+      }
+      if (
+        topic.revision?.status === 'due' ||
+        topic.revision?.status === 'needs_revision'
+      ) {
+        return 1;
+      }
+      if (topic.performance?.classification === 'insufficient') {
+        return 2;
+      }
+      return 3;
+    };
+
+    const ordered = [...remaining].sort((left, right) => {
+      const rankDifference = rank(left) - rank(right);
+      return rankDifference !== 0 ? rankDifference : left.topicId.localeCompare(right.topicId);
+    });
+
+    const usedChunkIds = new Set<string>();
+    const sequence: AIExamPreparationSequenceItem[] = ordered.map((topic) => {
+      const keywords = MockAIProvider.extractKeywords(
+        `${topic.topicName} ${topic.performance?.evidence.join(' ') ?? ''}`,
+        8,
+      );
+      const source = input.sourceChunks.find((chunk) => {
+        const haystack = `${chunk.documentTitle} ${chunk.section ?? ''} ${chunk.text}`.toLowerCase();
+        return keywords.some((keyword) => haystack.includes(keyword));
+      });
+      if (source) {
+        usedChunkIds.add(source.chunkId);
+      }
+
+      const reason =
+        topic.performance?.evidence[0] ??
+        (topic.revision
+          ? `Revision memory strength is ${topic.revision.memoryStrength}% with status "${topic.revision.status}".`
+          : 'No quiz or revision evidence is available yet, so this topic is treated as not started.');
+      const practiceActivity =
+        topic.performance?.classification === 'weak'
+          ? `Answer fresh practice questions on ${topic.topicName}, then review each mistake.`
+          : topic.revision?.status === 'due'
+            ? `Start with a short active-recall review of ${topic.topicName}, then test yourself.`
+            : `Study ${topic.topicName} in short blocks and finish with active recall.`;
+
+      return {
+        topicId: topic.topicId,
+        reason: MockAIProvider.truncate(reason, 260),
+        practiceActivity: MockAIProvider.truncate(practiceActivity, 200),
+      };
+    });
+
+    const cautions: string[] = [];
+    if (!input.dataQuality.reliable) {
+      cautions.push(
+        'Quiz evidence is limited; the sequence prioritises available signals and should be reviewed after more practice.',
+      );
+    }
+    if (input.sourceChunks.length === 0) {
+      cautions.push(
+        'No syllabus excerpts are available, so sequence reasons rely on performance and revision data only.',
+      );
+    }
+    if (input.availability.source === 'default') {
+      cautions.push(
+        'Saved availability was not found; the schedule uses default weekly study budgets.',
+      );
+    }
+
+    return {
+      summary: MockAIProvider.truncate(
+        `Prepare for ${input.examName} in ${input.daysRemaining} day(s). Start with ${ordered
+          .slice(0, 3)
+          .map((topic) => topic.topicName)
+          .join(', ')}${ordered.length > 3 ? ', then the remaining topics' : ''}.`,
+        600,
+      ),
+      sequence,
+      cautions,
+      usedChunkIds: [...usedChunkIds],
     };
   }
 

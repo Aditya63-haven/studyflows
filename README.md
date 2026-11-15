@@ -15,6 +15,7 @@ The project deliberately uses classes, inheritance, interfaces, design patterns 
 - Flashcard decks with flip, shuffle and Again/Hard/Good/Easy review ratings.
 - Spaced-repetition scheduling with due-today, needs-revision and mastered views.
 - Exam plans generated day by day from exam date, subjects, study hours and topics.
+- Exam preparation previews that combine syllabus document excerpts, quiz performance, revision state and weekly availability, with AI-suggested topic sequencing and an explicit fingerprint-based approval step.
 - Analytics for study time, streaks, quiz trends, weak topics and subject breakdowns.
 - Performance intelligence with deterministic accuracy, topic trends, weak/strong evidence, study consistency and data-quality limits.
 - Grounded AI performance interpretation with user-approved revision recommendations.
@@ -185,6 +186,7 @@ The Jest suite includes:
 - Gemini adapter, AI access, assistant chat and rate-limit tests; the Gemini SDK is mocked and no real API calls are made.
 - Document processing tests for validation, size limits, extraction, chunk page references and empty files, plus API tests for upload, download, ownership, assistant grounding and deletion cleanup.
 - Performance-analysis unit tests for accuracy, trends, weak/strong classification, data-quality limits and recommendation acceptance, plus API tests for the deterministic report, idempotent recommendation acceptance and grounded AI interpretation.
+- Exam-preparation tests for the deterministic scheduler, service preview/approval workflow, mock and Gemini provider contracts and API ownership, fingerprint and shortfall acknowledgement rules.
 - `mongodb-memory-server` provides an isolated database for integration tests, so no local test database is required.
 
 Other backend checks:
@@ -202,6 +204,17 @@ cd frontend
 npm test
 npm run build
 ```
+
+### Manual verification: exam preparation
+
+1. Start the backend and frontend, then log in with an account that has AI access.
+2. Create a study space, upload a text-based syllabus document and wait until its status is `ready`.
+3. Create an exam plan with at least two topics, then open the plan.
+4. In **AI exam preparation**, choose the study space, select one or more processed documents and generate a preview.
+5. Confirm that topic evidence shows quiz/revision reasons, source excerpts show document/page/section references, and the schedule only changes calendar decisions on the server.
+6. Approve the preview. The plan should gain study days and an approved preparation record with the same shortfall shown in the preview.
+7. Repeat the approval request with the same fingerprint; it should be idempotent. Change the topic order or selection and reuse the old fingerprint; the API should respond with `409`.
+8. For an overbooked plan, approval without `acknowledgeConflicts: true` should return `409`; acknowledgment allows the partial schedule to be saved.
 
 ## API Endpoints
 
@@ -292,6 +305,9 @@ Authorization: Bearer <token>
 | PATCH  | `/exam-plans/:id`                          | Update an exam plan        |
 | DELETE | `/exam-plans/:id`                          | Delete an exam plan        |
 | POST   | `/exam-plans/:id/topics/:topicId/complete` | Mark a topic complete      |
+| GET    | `/exam-plans/:id/preparation`              | Get topic evidence, documents, deterministic schedule and any approved preparation (`spaceId` query optional) |
+| POST   | `/exam-plans/:id/preparation/preview`      | Generate an AI sequencing preview without persisting it |
+| POST   | `/exam-plans/:id/preparation/approve`      | Approve the exact preview fingerprint and persist the schedule (requires `acknowledgeConflicts` when minutes do not fit) |
 | GET    | `/analytics`                               | Get the analytics overview |
 | GET    | `/analytics/performance`                   | Deterministic performance report with filters (`days`, `from`, `to`, `subject`, `spaceId`) |
 | POST   | `/analytics/performance/recommendations/:id/accept` | Add one recommended revision activity idempotently |

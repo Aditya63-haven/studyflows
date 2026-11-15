@@ -116,6 +116,9 @@ export class ExamPlanService {
         dailyStudyHours: rebuilt.getDailyStudyHours(),
         topics: rebuilt.getTopics(),
         studyDays: rebuilt.getStudyDays(),
+        spaceId: plan.getSpaceId(),
+        documentIds: plan.getDocumentIds(),
+        preparation: null,
         createdAt: plan.getCreatedAt(),
       });
 
@@ -127,6 +130,18 @@ export class ExamPlanService {
 
     if (input.name !== undefined) {
       plan.setName(input.name);
+    }
+    return this.save(planId, plan);
+  }
+
+  public async persistPrepared(
+    ownerId: string,
+    planId: string,
+    plan: ExamPlan,
+  ): Promise<ExamPlan> {
+    const owned = await this.getOwned(ownerId, planId);
+    if (owned.getId() !== plan.getId()) {
+      throw new ValidationError('Prepared plan does not match the requested exam plan');
     }
     return this.save(planId, plan);
   }

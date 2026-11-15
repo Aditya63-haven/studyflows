@@ -7,6 +7,9 @@ import {
   AIGeneratedQuestion,
   AINoteInput,
   AIQuizInput,
+  AIExamPreparationInput,
+  AIExamPreparationInterpretation,
+  AIExamPreparationSequenceItem,
   AIPerformanceInput,
   AIPerformanceInterpretation,
   AIPerformancePracticeSuggestion,
@@ -27,6 +30,10 @@ interface CommandResponse {
 
 interface PerformanceResponse {
   interpretation?: AIPerformanceInterpretation;
+}
+
+interface ExamPreparationResponse {
+  interpretation?: AIExamPreparationInterpretation;
 }
 
 /**
@@ -134,6 +141,68 @@ export class ExternalAIProvider implements IAIProvider {
       trendInterpretation: interpretation.trendInterpretation.trim(),
       focusTopicIds: strings(interpretation.focusTopicIds),
       practiceSuggestions: suggestions,
+    };
+  }
+
+  public async planExamPreparation(
+    input: AIExamPreparationInput,
+  ): Promise<AIExamPreparationInterpretation> {
+    const response = await this.post<ExamPreparationResponse>(
+      '/plan-exam-preparation',
+      input,
+    );
+    const interpretation = response.interpretation;
+    if (
+      !interpretation ||
+      typeof interpretation.summary !== 'string' ||
+      interpretation.summary.trim().length === 0 ||
+      !Array.isArray(interpretation.sequence)
+    ) {
+      throw new AppError(
+        'External AI provider returned an invalid exam preparation strategy',
+        502,
+        false,
+      );
+    }
+
+    const knownTopicIds = new Set(input.topics.map((topic) => topic.topicId));
+    const knownChunkIds = new Set(input.sourceChunks.map((chunk) => chunk.chunkId));
+    const seenTopicIds = new Set<string>();
+    const sequence: AIExamPreparationSequenceItem[] = interpretation.sequence
+      .filter(
+        (item): item is AIExamPreparationSequenceItem =>
+          Boolean(item) &&
+          typeof item.topicId === 'string' &&
+          knownTopicIds.has(item.topicId) &&
+          !seenTopicIds.has(item.topicId) &&
+          typeof item.reason === 'string' &&
+          item.reason.trim().length > 0 &&
+          typeof item.practiceActivity === 'string' &&
+          item.practiceActivity.trim().length > 0 &&
+          Boolean(seenTopicIds.add(item.topicId)),
+      )
+      .slice(0, input.topics.length)
+      .map((item) => ({
+        topicId: item.topicId,
+        reason: item.reason.trim(),
+        practiceActivity: item.practiceActivity.trim(),
+      }));
+
+    const strings = (value: unknown, limit: number): string[] =>
+      Array.isArray(value)
+        ? value
+            .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+            .map((item) => item.trim())
+            .slice(0, limit)
+        : [];
+
+    return {
+      summary: interpretation.summary.trim(),
+      sequence,
+      cautions: strings(interpretation.cautions, 4),
+      usedChunkIds: strings(interpretation.usedChunkIds, 12).filter((chunkId) =>
+        knownChunkIds.has(chunkId),
+      ),
     };
   }
 

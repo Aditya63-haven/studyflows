@@ -197,6 +197,16 @@ export interface StudyDay {
   progress: number;
 }
 
+export interface ExamPreparationRecord {
+  provider: string;
+  strategySummary: string;
+  approvedAt: string;
+  approvalFingerprint: string;
+  requiredMinutes: number;
+  scheduledMinutes: number;
+  shortfallMinutes: number;
+}
+
 export interface ExamPlan {
   id: string;
   name: string;
@@ -204,10 +214,162 @@ export interface ExamPlan {
   dailyStudyHours: number;
   daysRemaining: number;
   progress: number;
+  spaceId: string | null;
+  documentIds: string[];
+  preparation: ExamPreparationRecord | null;
   topics: ExamTopic[];
   studyDays: StudyDay[];
   createdAt: string;
   updatedAt: string;
+}
+
+export type PreparationTopicStatus =
+  | 'completed'
+  | 'weak'
+  | 'due'
+  | 'needs_revision'
+  | 'insufficient'
+  | 'strong'
+  | 'neutral'
+  | 'mastered'
+  | 'not_started';
+
+export interface PreparationSource {
+  chunkId: string;
+  documentId: string;
+  documentTitle: string;
+  pageNumber: number | null;
+  section: string | null;
+  excerpt: string;
+}
+
+export interface PreparationDocument {
+  id: string;
+  title: string;
+  format: string;
+  chunkCount: number;
+  selected: boolean;
+}
+
+export interface PreparationTopicPerformance {
+  accuracy: number | null;
+  answeredQuestions: number;
+  classification: string;
+  trendDirection: string;
+  evidence: string[];
+}
+
+export interface PreparationTopicRevision {
+  memoryStrength: number;
+  status: string;
+  nextReviewAt: string;
+}
+
+export interface PreparationTopic {
+  id: string;
+  name: string;
+  description: string;
+  estimatedMinutes: number;
+  completed: boolean;
+  status: PreparationTopicStatus;
+  priorityRank: number;
+  evidence: string[];
+  performance: PreparationTopicPerformance | null;
+  revision: PreparationTopicRevision | null;
+  sources: PreparationSource[];
+}
+
+export interface PreparationDay {
+  date: string;
+  topicIds: string[];
+  plannedMinutes: number;
+}
+
+export interface PreparationSchedule {
+  days: PreparationDay[];
+  requiredMinutes: number;
+  availableMinutes: number;
+  scheduledMinutes: number;
+  shortfallMinutes: number;
+  unscheduledTopicIds: string[];
+  warnings: string[];
+}
+
+export interface PreparationStrategyItem {
+  topicId: string;
+  topicName: string;
+  reason: string;
+  practiceActivity: string;
+  source: 'ai' | 'server';
+}
+
+export interface PreparationStrategy {
+  provider: string;
+  summary: string;
+  items: PreparationStrategyItem[];
+  cautions: string[];
+  usedChunkIds: string[];
+  fallback: boolean;
+  warning: string | null;
+}
+
+export interface ExamPreparationOverview {
+  planId: string;
+  examName: string;
+  examDate: string;
+  daysRemaining: number;
+  dailyStudyHours: number;
+  space: { id: string; name: string; subject: string } | null;
+  documents: PreparationDocument[];
+  selectedDocumentIds: string[];
+  topics: PreparationTopic[];
+  topicOrder: string[];
+  schedule: PreparationSchedule;
+  availability: { source: 'saved' | 'default'; weeklyMinutes: number };
+  dataQuality: {
+    reliable: boolean;
+    attemptCount: number;
+    answeredQuestions: number;
+    insufficientData: string[];
+    limitations: string[];
+  };
+  existingPreparation: {
+    provider: string;
+    strategySummary: string;
+    approvedAt: string;
+    approvalFingerprint: string;
+    requiredMinutes: number;
+    scheduledMinutes: number;
+    shortfallMinutes: number;
+  } | null;
+}
+
+export interface ExamPreparationPreview extends ExamPreparationOverview {
+  strategy: PreparationStrategy;
+  conflicts: string[];
+  requiresAcknowledgement: boolean;
+  approvalFingerprint: string;
+}
+
+export interface ExamPreparationSelection {
+  spaceId?: string | null;
+  documentIds?: string[];
+  topicOrder?: string[];
+  excludedTopicIds?: string[];
+  topicMinutes?: Record<string, number>;
+}
+
+export interface ExamPreparationApprovalInput extends ExamPreparationSelection {
+  approvalFingerprint: string;
+  acknowledgeConflicts?: boolean;
+  strategySummary?: string;
+  provider?: string;
+}
+
+export interface ExamPreparationApprovalResult {
+  plan: ExamPlan;
+  schedule: PreparationSchedule;
+  created: boolean;
 }
 
 export interface StudySession {

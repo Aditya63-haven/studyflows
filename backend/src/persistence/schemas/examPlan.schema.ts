@@ -15,6 +15,16 @@ export interface StudyDayRecord {
   plannedMinutes: number;
 }
 
+export interface ExamPreparationRecord {
+  provider: string;
+  strategySummary: string;
+  approvedAt: Date;
+  approvalFingerprint: string;
+  requiredMinutes: number;
+  scheduledMinutes: number;
+  shortfallMinutes: number;
+}
+
 export interface ExamPlanDocument {
   _id: string;
   owner: string;
@@ -23,6 +33,9 @@ export interface ExamPlanDocument {
   dailyStudyHours: number;
   topics: TopicRecord[];
   studyDays: StudyDayRecord[];
+  spaceId: string | null;
+  documentIds: string[];
+  preparation: ExamPreparationRecord | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -48,6 +61,19 @@ const studyDaySchema = new Schema<StudyDayRecord>(
   { _id: false },
 );
 
+const preparationSchema = new Schema<ExamPreparationRecord>(
+  {
+    provider: { type: String, required: true },
+    strategySummary: { type: String, default: '' },
+    approvedAt: { type: Date, required: true },
+    approvalFingerprint: { type: String, required: true },
+    requiredMinutes: { type: Number, required: true, min: 0 },
+    scheduledMinutes: { type: Number, required: true, min: 0 },
+    shortfallMinutes: { type: Number, required: true, min: 0 },
+  },
+  { _id: false },
+);
+
 const examPlanSchema = new Schema<ExamPlanDocument>(
   {
     _id: { type: String, required: true },
@@ -57,6 +83,9 @@ const examPlanSchema = new Schema<ExamPlanDocument>(
     dailyStudyHours: { type: Number, required: true },
     topics: { type: [topicSchema], default: [] },
     studyDays: { type: [studyDaySchema], default: [] },
+    spaceId: { type: String, default: null },
+    documentIds: { type: [String], default: [] },
+    preparation: { type: preparationSchema, default: null },
   },
   { timestamps: true, versionKey: false, collection: 'examplans' },
 );

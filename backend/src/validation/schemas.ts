@@ -156,6 +156,34 @@ export const markTopicCompleteSchema = z
   })
   .optional();
 
+const preparationSelectionShape = {
+  spaceId: z.string().trim().min(1).nullable().optional(),
+  documentIds: z.array(z.string().trim().min(1)).max(20).optional(),
+  topicOrder: z.array(z.string().trim().min(1)).max(100).optional(),
+  excludedTopicIds: z.array(z.string().trim().min(1)).max(100).optional(),
+  topicMinutes: z
+    .record(z.string().trim().min(1), z.number().int().min(1).max(1440))
+    .optional(),
+};
+
+export const examPreparationOverviewQuerySchema = z.object({
+  spaceId: z.string().trim().min(1).optional(),
+});
+
+export const examPreparationPreviewSchema = z
+  .object(preparationSelectionShape)
+  .strict();
+
+export const examPreparationApproveSchema = z
+  .object({
+    ...preparationSelectionShape,
+    approvalFingerprint: z.string().trim().min(1).max(200),
+    acknowledgeConflicts: z.boolean().optional(),
+    strategySummary: z.string().max(4000).optional(),
+    provider: z.string().trim().max(50).optional(),
+  })
+  .strict();
+
 export const createSessionSchema = z.object({
   spaceId: z.string().trim().min(1).nullable().optional(),
   subject: z.string().trim().max(120).optional(),

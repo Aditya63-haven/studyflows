@@ -322,6 +322,40 @@ export const AnalyticsPage = () => {
               </article>
             </div>
 
+            <div className="stats-grid">
+              <article className="stat-card">
+                <span className="stat-label">Planned vs completed</span>
+                <strong>
+                  {formatMinutes(performance.analysis.studyConsistency.completedMinutes)} /{' '}
+                  {formatMinutes(performance.analysis.studyConsistency.plannedMinutes)}
+                </strong>
+                <span className="muted">
+                  {performance.analysis.studyConsistency.planCompletionPercentage === null
+                    ? 'No exam-plan topics scheduled in this period'
+                    : `${performance.analysis.studyConsistency.planCompletionPercentage}% of planned topics completed`}
+                </span>
+              </article>
+              <article className="stat-card">
+                <span className="stat-label">Revision completion</span>
+                <strong>{performance.analysis.revision.mastered} mastered</strong>
+                <span className="muted">
+                  {performance.analysis.revision.dueNow} due ·{' '}
+                  {performance.analysis.revision.needsRevision} need revision ·{' '}
+                  {performance.analysis.revision.trackedTopics} tracked
+                </span>
+              </article>
+              <article className="stat-card">
+                <span className="stat-label">Study rhythm</span>
+                <strong>
+                  {performance.analysis.studyConsistency.currentStreakDays} day streak
+                </strong>
+                <span className="muted">
+                  {performance.analysis.studyConsistency.activeDayPercentage}% active days ·{' '}
+                  {performance.analysis.studyConsistency.averageSessionMinutes} min average
+                </span>
+              </article>
+            </div>
+
             <div className="split-grid">
               <section className="panel inset-panel">
                 <div className="section-heading tight">

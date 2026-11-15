@@ -205,6 +205,14 @@ export class Serializer {
       dailyStudyHours: plan.getDailyStudyHours(),
       daysRemaining: plan.getDaysRemaining(),
       progress: plan.getProgress(),
+      spaceId: plan.getSpaceId(),
+      documentIds: plan.getDocumentIds(),
+      preparation: plan.getPreparation()
+        ? {
+            ...plan.getPreparation()!,
+            approvedAt: plan.getPreparation()!.approvedAt,
+          }
+        : null,
       topics: plan.getTopics().map((topic) => ({
         id: topic.getId(),
         name: topic.getName(),

@@ -39,6 +39,7 @@ import { BookmarkService } from './services/BookmarkService';
 import { DocumentProcessingService } from './services/DocumentProcessingService';
 import { DocumentService } from './services/DocumentService';
 import { ExamPlanService } from './services/ExamPlanService';
+import { ExamPreparationService } from './services/ExamPreparationService';
 import { FlashcardService } from './services/FlashcardService';
 import { ImageProcessor } from './services/ImageProcessor';
 import { NoteService } from './services/NoteService';
@@ -65,6 +66,7 @@ export interface AppContainer {
   flashcardService: FlashcardService;
   revisionService: RevisionService;
   examPlanService: ExamPlanService;
+  examPreparationService: ExamPreparationService;
   availabilityService: AvailabilityService;
   analyticsService: AnalyticsService;
   performanceAnalysisService: PerformanceAnalysisService;
@@ -197,6 +199,10 @@ export const createContainer = (): AppContainer => {
   );
   const notificationService = new NotificationService(notificationRepository);
   const availabilityService = new AvailabilityService(availabilityRepository);
+  const examPlanService = new ExamPlanService(
+    examPlanRepository,
+    availabilityRepository,
+  );
 
   const rescheduleStrategies = {
     'next-free-slot': new MoveToNextFreeSlotStrategy(),
@@ -219,6 +225,20 @@ export const createContainer = (): AppContainer => {
   eventBus.subscribe('revision.due', notificationService);
 
   const aiProvider = createAIProvider(config);
+  const examPreparationService = new ExamPreparationService(
+    examPlanService,
+    examPlanRepository,
+    studySpaceService,
+    documentService,
+    documentChunkRepository,
+    sessionRepository,
+    revisionRepository,
+    availabilityRepository,
+    performanceAnalysisService,
+    aiProvider,
+    aiAccessService,
+    aiRateLimiter,
+  );
   const studyFacade = new StudyFacade({
     aiProvider,
     revisionStrategy,
@@ -259,7 +279,8 @@ export const createContainer = (): AppContainer => {
       bookmarkRepository,
     ),
     revisionService,
-    examPlanService: new ExamPlanService(examPlanRepository, availabilityRepository),
+    examPlanService,
+    examPreparationService,
     availabilityService,
     analyticsService,
     performanceAnalysisService,

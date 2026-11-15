@@ -30,6 +30,19 @@ export class ExamPlanMapper {
             plannedMinutes: day.plannedMinutes,
           }),
       ),
+      spaceId: document.spaceId ?? null,
+      documentIds: document.documentIds ?? [],
+      preparation: document.preparation
+        ? {
+            provider: document.preparation.provider,
+            strategySummary: document.preparation.strategySummary,
+            approvedAt: document.preparation.approvedAt,
+            approvalFingerprint: document.preparation.approvalFingerprint,
+            requiredMinutes: document.preparation.requiredMinutes,
+            scheduledMinutes: document.preparation.scheduledMinutes,
+            shortfallMinutes: document.preparation.shortfallMinutes,
+          }
+        : null,
       createdAt: document.createdAt,
       updatedAt: document.updatedAt,
     });
@@ -55,6 +68,19 @@ export class ExamPlanMapper {
         completedTopicIds: day.getCompletedTopicIds(),
         plannedMinutes: day.getPlannedMinutes(),
       })),
+      spaceId: plan.getSpaceId(),
+      documentIds: plan.getDocumentIds(),
+      preparation: plan.getPreparation()
+        ? {
+            provider: plan.getPreparation()!.provider,
+            strategySummary: plan.getPreparation()!.strategySummary,
+            approvedAt: plan.getPreparation()!.approvedAt,
+            approvalFingerprint: plan.getPreparation()!.approvalFingerprint,
+            requiredMinutes: plan.getPreparation()!.requiredMinutes,
+            scheduledMinutes: plan.getPreparation()!.scheduledMinutes,
+            shortfallMinutes: plan.getPreparation()!.shortfallMinutes,
+          }
+        : null,
       createdAt: plan.getCreatedAt(),
       updatedAt: plan.getUpdatedAt(),
     };

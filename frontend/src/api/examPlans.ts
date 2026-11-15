@@ -1,5 +1,13 @@
 import apiClient from './client';
-import { ExamPlan, ExamPlanInput } from './types';
+import {
+  ExamPlan,
+  ExamPlanInput,
+  ExamPreparationApprovalInput,
+  ExamPreparationApprovalResult,
+  ExamPreparationOverview,
+  ExamPreparationPreview,
+  ExamPreparationSelection,
+} from './types';
 
 export const examPlansApi = {
   async list(): Promise<ExamPlan[]> {
@@ -47,5 +55,38 @@ export const examPlansApi = {
       dayId ? { dayId } : {},
     );
     return data.examPlan;
+  },
+
+  async getPreparation(
+    planId: string,
+    spaceId?: string | null,
+  ): Promise<ExamPreparationOverview> {
+    const { data } = await apiClient.get<{ preparation: ExamPreparationOverview }>(
+      `/exam-plans/${planId}/preparation`,
+      spaceId ? { params: { spaceId } } : undefined,
+    );
+    return data.preparation;
+  },
+
+  async previewPreparation(
+    planId: string,
+    input: ExamPreparationSelection,
+  ): Promise<ExamPreparationPreview> {
+    const { data } = await apiClient.post<{ preparation: ExamPreparationPreview }>(
+      `/exam-plans/${planId}/preparation/preview`,
+      input,
+    );
+    return data.preparation;
+  },
+
+  async approvePreparation(
+    planId: string,
+    input: ExamPreparationApprovalInput,
+  ): Promise<ExamPreparationApprovalResult> {
+    const { data } = await apiClient.post<ExamPreparationApprovalResult>(
+      `/exam-plans/${planId}/preparation/approve`,
+      input,
+    );
+    return data;
   },
 };

@@ -5,6 +5,11 @@ import {
   ExamPlanService,
   UpdateExamPlanInput,
 } from '../services/ExamPlanService';
+import {
+  ApprovePreparationInput,
+  ExamPreparationService,
+  PreparationSelection,
+} from '../services/ExamPreparationService';
 import { authContext } from '../utils/authContext';
 import { Serializer } from '../utils/serializers';
 
@@ -16,7 +21,10 @@ interface MarkTopicBody {
  * HTTP adapter for exam plan use cases.
  */
 export class ExamPlanController {
-  constructor(private readonly examPlanService: ExamPlanService) {}
+  constructor(
+    private readonly examPlanService: ExamPlanService,
+    private readonly examPreparationService: ExamPreparationService,
+  ) {}
 
   public list = asyncHandler(async (req: Request, res: Response) => {
     const { userId } = authContext(req);
@@ -65,5 +73,39 @@ export class ExamPlanController {
       body?.dayId,
     );
     res.status(200).json({ examPlan: Serializer.examPlan(plan) });
+  });
+
+  public getPreparation = asyncHandler(async (req: Request, res: Response) => {
+    const { userId } = authContext(req);
+    const preparation = await this.examPreparationService.getOverview(
+      userId,
+      req.params.id,
+      req.query as PreparationSelection,
+    );
+    res.status(200).json({ preparation });
+  });
+
+  public previewPreparation = asyncHandler(async (req: Request, res: Response) => {
+    const { userId } = authContext(req);
+    const preparation = await this.examPreparationService.preview(
+      userId,
+      req.params.id,
+      req.body as PreparationSelection,
+    );
+    res.status(200).json({ preparation });
+  });
+
+  public approvePreparation = asyncHandler(async (req: Request, res: Response) => {
+    const { userId } = authContext(req);
+    const result = await this.examPreparationService.approve(
+      userId,
+      req.params.id,
+      req.body as ApprovePreparationInput,
+    );
+    res.status(200).json({
+      examPlan: Serializer.examPlan(result.plan),
+      schedule: result.schedule,
+      created: result.created,
+    });
   });
 }

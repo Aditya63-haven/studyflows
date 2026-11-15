@@ -123,22 +123,22 @@ const performanceReport: PerformanceReport = {
       longestStreakDays: 1,
       availableMinutesPerWeek: 600,
       availabilitySource: 'default',
-      plannedMinutes: 0,
-      completedMinutes: 0,
-      plannedTopicSlots: 0,
-      completedTopicSlots: 0,
-      planCompletionPercentage: null,
+      plannedMinutes: 120,
+      completedMinutes: 60,
+      plannedTopicSlots: 4,
+      completedTopicSlots: 2,
+      planCompletionPercentage: 50,
       upcomingExams: [],
       pendingPlanTopics: [],
     },
     revision: {
-      trackedTopics: 0,
-      dueNow: 0,
-      needsRevision: 0,
-      mastered: 0,
-      reviewedInRange: 0,
-      averageMemoryStrength: null,
-      masteredPercentage: null,
+      trackedTopics: 4,
+      dueNow: 1,
+      needsRevision: 1,
+      mastered: 2,
+      reviewedInRange: 2,
+      averageMemoryStrength: 62,
+      masteredPercentage: 50,
     },
   },
   recommendations: [
@@ -214,6 +214,10 @@ describe('AnalyticsPage duration input', () => {
     expect(await screen.findByText('Performance intelligence')).toBeInTheDocument();
     expect(screen.getAllByText('2/5 questions correct (40% accuracy).').length).toBeGreaterThan(0);
     expect(screen.getByText(/topic tags/)).toBeInTheDocument();
+    expect(screen.getByText('1 hr / 2 hr')).toBeInTheDocument();
+    expect(screen.getByText('50% of planned topics completed')).toBeInTheDocument();
+    expect(screen.getByText('2 mastered')).toBeInTheDocument();
+    expect(screen.getByText('1 due · 1 need revision · 4 tracked')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Add to revision' }));
 
