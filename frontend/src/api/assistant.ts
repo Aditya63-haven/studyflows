@@ -3,8 +3,10 @@ import {
   AppliedChange,
   AssistantChatInput,
   AssistantChatResult,
+  AssistantPerformanceResult,
   AssistantProposal,
   ExamPlan,
+  PerformanceFilters,
   RescheduleStrategyName,
 } from './types';
 
@@ -34,5 +36,13 @@ export const assistantApi = {
       { planId, strategy },
     );
     return data;
+  },
+
+  async performance(filters: PerformanceFilters = {}): Promise<AssistantPerformanceResult> {
+    const { data } = await apiClient.post<{ result: AssistantPerformanceResult }>(
+      '/assistant/performance',
+      filters,
+    );
+    return data.result;
   },
 };

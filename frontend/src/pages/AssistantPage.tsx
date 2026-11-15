@@ -8,7 +8,9 @@ import {
 import { Link } from 'react-router-dom';
 import {
   aiAccessApi,
+  analyticsApi,
   assistantApi,
+  documentsApi,
   getErrorMessage,
   notesApi,
   spacesApi,
@@ -17,7 +19,11 @@ import type {
   AiAccessStatus,
   AssistantChatMode,
   AssistantCitation,
+  AssistantDocumentCitation,
+  AssistantPerformanceResult,
   Note,
+  RevisionRecommendation,
+  StudyDocument,
   StudySpace,
 } from '../api/types';
 import { Button } from '../components/Button';
@@ -33,6 +39,7 @@ interface ChatEntry {
   role: 'user' | 'assistant';
   content: string;
   citations?: AssistantCitation[];
+  documentCitations?: AssistantDocumentCitation[];
   usedExternalKnowledge?: boolean;
   provider?: string;
 }
@@ -53,12 +60,20 @@ export const AssistantPage = () => {
   const [spaceId, setSpaceId] = useState('');
   const [notes, setNotes] = useState<Note[]>([]);
   const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
+  const [documents, setDocuments] = useState<StudyDocument[]>([]);
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
   const [mode, setMode] = useState<AssistantChatMode>('answer');
   const [messages, setMessages] = useState<ChatEntry[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [notesLoading, setNotesLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  const [performance, setPerformance] = useState<AssistantPerformanceResult | null>(null);
+  const [analyzingPerformance, setAnalyzingPerformance] = useState(false);
+  const [acceptingRecommendation, setAcceptingRecommendation] = useState<string | null>(
+    null,
+  );
+  const [performanceNotice, setPerformanceNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -93,21 +108,27 @@ export const AssistantPage = () => {
     if (!spaceId) {
       setNotes([]);
       setSelectedNoteIds([]);
+      setDocuments([]);
+      setSelectedDocumentIds([]);
       return undefined;
     }
 
     let active = true;
     setNotes([]);
     setSelectedNoteIds([]);
+    setDocuments([]);
+    setSelectedDocumentIds([]);
     setNotesLoading(true);
-    notesApi
-      .listBySpace(spaceId)
-      .then((result) => {
+    Promise.all([notesApi.listBySpace(spaceId), documentsApi.listBySpace(spaceId)])
+      .then(([noteList, documentList]) => {
         if (!active) {
           return;
         }
-        setNotes(result);
-        setSelectedNoteIds(result.map((note) => note.id));
+        setNotes(noteList);
+        setSelectedNoteIds(noteList.map((note) => note.id));
+        const ready = documentList.filter((document) => document.status === 'ready');
+        setDocuments(ready);
+        setSelectedDocumentIds(ready.map((document) => document.id));
       })
       .catch((requestError) => {
         if (active) {
@@ -126,6 +147,11 @@ export const AssistantPage = () => {
   }, [spaceId]);
 
   useEffect(() => {
+    setPerformance(null);
+    setPerformanceNotice(null);
+  }, [spaceId]);
+
+  useEffect(() => {
     endRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'end' });
   }, [messages, sending]);
 
@@ -134,6 +160,14 @@ export const AssistantPage = () => {
       current.includes(noteId)
         ? current.filter((id) => id !== noteId)
         : [...current, noteId],
+    );
+  };
+
+  const toggleDocument = (documentId: string) => {
+    setSelectedDocumentIds((current) =>
+      current.includes(documentId)
+        ? current.filter((id) => id !== documentId)
+        : [...current, documentId],
     );
   };
 
@@ -164,6 +198,7 @@ export const AssistantPage = () => {
         mode,
         spaceId: spaceId || null,
         noteIds: selectedNoteIds,
+        documentIds: selectedDocumentIds,
         history,
       });
       setMessages((current) => [
@@ -173,6 +208,7 @@ export const AssistantPage = () => {
           role: 'assistant',
           content: result.answer,
           citations: result.citations,
+          documentCitations: result.documentCitations,
           usedExternalKnowledge: result.usedExternalKnowledge,
           provider: result.provider,
         },
@@ -181,6 +217,55 @@ export const AssistantPage = () => {
       setError(getErrorMessage(requestError));
     } finally {
       setSending(false);
+    }
+  };
+
+  const analyzePerformance = async () => {
+    setAnalyzingPerformance(true);
+    setError(null);
+    setPerformanceNotice(null);
+    try {
+      setPerformance(
+        await assistantApi.performance({
+          days: 90,
+          spaceId: spaceId || undefined,
+        }),
+      );
+    } catch (requestError) {
+      setError(getErrorMessage(requestError));
+    } finally {
+      setAnalyzingPerformance(false);
+    }
+  };
+
+  const acceptRecommendation = async (recommendation: RevisionRecommendation) => {
+    setAcceptingRecommendation(recommendation.id);
+    setError(null);
+    setPerformanceNotice(null);
+    try {
+      const filters = { days: 90, spaceId: spaceId || undefined };
+      const result = await analyticsApi.acceptRecommendation(recommendation.id, filters);
+      setPerformanceNotice(
+        result.created
+          ? `Added "${recommendation.topicName}" to your revision schedule.`
+          : `"${recommendation.topicName}" already has a revision schedule.`,
+      );
+      setPerformance((current) =>
+        current
+          ? {
+              ...current,
+              recommendations: current.recommendations.map((candidate) =>
+                candidate.id === recommendation.id
+                  ? { ...candidate, alreadyScheduled: true, addable: false }
+                  : candidate,
+              ),
+            }
+          : current,
+      );
+    } catch (requestError) {
+      setError(getErrorMessage(requestError));
+    } finally {
+      setAcceptingRecommendation(null);
     }
   };
 
@@ -240,24 +325,162 @@ export const AssistantPage = () => {
     <div className="stack large">
       <PageHeader
         eyebrow="Study assistant"
-        title="Ask your notes"
-        description="Choose the material to include, then ask for explanations, summaries or answers."
+        title="Ask your material"
+        description="Choose notes and documents to include, then ask for explanations, summaries or answers."
         actions={
-          messages.length > 0 ? (
-            <Button variant="secondary" onClick={() => setMessages([])}>
-              Clear chat
+          <div className="toolbar">
+            <Button
+              variant="secondary"
+              onClick={() => void analyzePerformance()}
+              disabled={analyzingPerformance}
+            >
+              {analyzingPerformance ? 'Analyzing...' : 'Analyze my performance'}
             </Button>
-          ) : null
+            {messages.length > 0 ? (
+              <Button variant="secondary" onClick={() => setMessages([])}>
+                Clear chat
+              </Button>
+            ) : null}
+          </div>
         }
       />
 
       <ErrorBanner message={error} onDismiss={() => setError(null)} />
 
+      {performanceNotice ? (
+        <p className="notice">{performanceNotice}</p>
+      ) : null}
+
+      {performance ? (
+        <section className="panel assistant-performance" aria-label="Performance interpretation">
+          <div className="section-heading">
+            <div>
+              <h2>Performance interpretation</h2>
+              <p className="muted small-text">
+                AI interpretation of measured quiz and revision data from the last 90
+                days. The numbers below come from the backend, not the model.
+              </p>
+            </div>
+            <span className="badge">{performance.provider}</span>
+          </div>
+
+          <p>{performance.summary}</p>
+          <p className="muted small-text">{performance.trendInterpretation}</p>
+
+          <div className="split-grid">
+            <div>
+              <h3>Strengths</h3>
+              {performance.strengths.length === 0 ? (
+                <p className="muted small-text">No clear strengths yet.</p>
+              ) : (
+                <ul className="evidence-list">
+                  {performance.strengths.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div>
+              <h3>Improvement areas</h3>
+              {performance.improvementAreas.length === 0 ? (
+                <p className="muted small-text">No weak areas identified.</p>
+              ) : (
+                <ul className="evidence-list">
+                  {performance.improvementAreas.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+
+          {performance.focusTopics.length > 0 ? (
+            <div>
+              <h3>Focus topics</h3>
+              <div className="tag-row">
+                {performance.focusTopics.map((topic) => (
+                  <span key={topic.topicId} className="tag">
+                    {topic.topicName} · {topic.accuracy ?? '—'}%
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {performance.practiceSuggestions.length > 0 ? (
+            <div>
+              <h3>Practice suggestions</h3>
+              <div className="stack">
+                {performance.practiceSuggestions.map((suggestion) => (
+                  <div key={`${suggestion.title}-${suggestion.topicId ?? 'general'}`}>
+                    <strong>{suggestion.title}</strong>
+                    <p className="muted small-text">{suggestion.reason}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {performance.recommendations.length > 0 ? (
+            <div>
+              <h3>Recommended revision</h3>
+              <div className="stack">
+                {performance.recommendations.slice(0, 3).map((recommendation) => (
+                  <article key={recommendation.id} className="recommendation-card">
+                    <div className="section-heading tight">
+                      <div>
+                        <strong>{recommendation.title}</strong>
+                        <p className="muted small-text">{recommendation.reason}</p>
+                      </div>
+                      <span className={`badge priority-${recommendation.priority}`}>
+                        {recommendation.priority}
+                      </span>
+                    </div>
+                    <div className="recommendation-actions">
+                      <span className="muted small-text">
+                        {recommendation.suggestedMinutes} minutes
+                      </span>
+                      <button
+                        type="button"
+                        className="button secondary"
+                        disabled={
+                          !recommendation.addable ||
+                          recommendation.alreadyScheduled ||
+                          acceptingRecommendation === recommendation.id
+                        }
+                        onClick={() => void acceptRecommendation(recommendation)}
+                      >
+                        {recommendation.alreadyScheduled
+                          ? 'Already scheduled'
+                          : acceptingRecommendation === recommendation.id
+                            ? 'Adding...'
+                            : 'Add to revision'}
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {performance.dataQuality.limitations.length > 0 ? (
+            <details>
+              <summary>Data limitations</summary>
+              <ul className="evidence-list">
+                {performance.dataQuality.limitations.map((limitation) => (
+                  <li key={limitation}>{limitation}</li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
+        </section>
+      ) : null}
+
       <div className="assistant-layout">
         <div className="stack">
           <Card
             title="Study context"
-            description="Only selected notes from a space you own are sent to Gemini."
+            description="Only selected notes and documents from a space you own are sent to Gemini."
           >
             <div className="stack">
               <label className="field">
@@ -266,7 +489,7 @@ export const AssistantPage = () => {
                   value={spaceId}
                   onChange={(event) => setSpaceId(event.target.value)}
                 >
-                  <option value="">General chat (no notes)</option>
+                  <option value="">General chat (no study context)</option>
                   {spaces.map((space) => (
                     <option key={space.id} value={space.id}>
                       {space.name} - {space.subject}
@@ -340,17 +563,75 @@ export const AssistantPage = () => {
                   ))}
                 </div>
               )}
+
+              <div className="assistant-note-head">
+                <div>
+                  <strong>Documents</strong>
+                  <p className="muted small-text">
+                    {spaceId
+                      ? `${selectedDocumentIds.length} of ${documents.length} selected`
+                      : 'Select a study space to include documents.'}
+                  </p>
+                </div>
+                {documents.length > 0 ? (
+                  <button
+                    type="button"
+                    className="assistant-text-button"
+                    onClick={() =>
+                      setSelectedDocumentIds(
+                        selectedDocumentIds.length === documents.length
+                          ? []
+                          : documents.map((document) => document.id),
+                      )
+                    }
+                  >
+                    {selectedDocumentIds.length === documents.length
+                      ? 'Clear all'
+                      : 'Select all'}
+                  </button>
+                ) : null}
+              </div>
+
+              {notesLoading ? (
+                <p className="muted small-text">Loading documents...</p>
+              ) : documents.length === 0 ? (
+                <p className="muted small-text">
+                  {spaceId
+                    ? 'This space has no processed documents yet. Upload files from the study space.'
+                    : 'No documents will be included in this conversation.'}
+                </p>
+              ) : (
+                <div className="assistant-note-list">
+                  {documents.map((document) => (
+                    <label key={document.id} className="assistant-note-option">
+                      <input
+                        type="checkbox"
+                        checked={selectedDocumentIds.includes(document.id)}
+                        onChange={() => toggleDocument(document.id)}
+                      />
+                      <span>
+                        <strong>{document.originalName}</strong>
+                        <small>
+                          {document.format.toUpperCase()}
+                          {document.pageCount > 0 ? ` · ${document.pageCount} pages` : ''}
+                          {` · ${document.chunkCount} chunks`}
+                        </small>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
           </Card>
 
           <Card title="Privacy">
             <p className="muted small-text">
-              Selected notes and your prompts are processed by Google Gemini. On Google's
-              Free tier, submitted data may be used to improve Google products. Do not
-              include sensitive personal information.
+              Selected notes, document excerpts and your prompts are processed by Google
+              Gemini. On Google's Free tier, submitted data may be used to improve Google
+              products. Do not include sensitive personal information.
             </p>
             <p className="footnote">
-              AI answers can be wrong. Check important details against your notes.
+              AI answers can be wrong. Check important details against your source material.
             </p>
           </Card>
         </div>
@@ -360,9 +641,22 @@ export const AssistantPage = () => {
             <div>
               <h2>{spaces.find((space) => space.id === spaceId)?.name ?? 'General chat'}</h2>
               <p className="muted small-text">
-                {selectedNoteIds.length > 0
-                  ? `${selectedNoteIds.length} note${selectedNoteIds.length === 1 ? '' : 's'} in context`
-                  : 'No note context selected'}
+                {selectedNoteIds.length > 0 || selectedDocumentIds.length > 0
+                  ? [
+                      selectedNoteIds.length > 0
+                        ? `${selectedNoteIds.length} note${
+                            selectedNoteIds.length === 1 ? '' : 's'
+                          }`
+                        : '',
+                      selectedDocumentIds.length > 0
+                        ? `${selectedDocumentIds.length} document${
+                            selectedDocumentIds.length === 1 ? '' : 's'
+                          }`
+                        : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' and ') + ' in context'
+                  : 'No study context selected'}
               </p>
             </div>
             <span className="badge">Gemini</span>
@@ -418,8 +712,25 @@ export const AssistantPage = () => {
                             {citation.title}
                           </Link>
                         ))}
+                        {entry.documentCitations?.map((citation) => (
+                          <span
+                            key={citation.id}
+                            className="assistant-citation document"
+                            title={citation.excerpt}
+                          >
+                            {citation.title}
+                            {citation.pageNumber ? ` · p. ${citation.pageNumber}` : ''}
+                            {citation.section ? ` · ${citation.section}` : ''}
+                          </span>
+                        ))}
                         {entry.usedExternalKnowledge ? (
                           <span className="badge warning">General knowledge</span>
+                        ) : entry.documentCitations?.length && entry.citations?.length ? (
+                          <span className="badge success">
+                            From your notes and documents
+                          </span>
+                        ) : entry.documentCitations?.length ? (
+                          <span className="badge success">From your documents</span>
                         ) : entry.citations?.length ? (
                           <span className="badge success">From your notes</span>
                         ) : null}

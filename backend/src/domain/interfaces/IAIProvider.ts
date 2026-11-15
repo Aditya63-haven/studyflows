@@ -67,19 +67,154 @@ export interface AIContextNote {
   tags: string[];
 }
 
+export interface AIContextChunk {
+  id: string;
+  text: string;
+  pageNumber: number | null;
+  section: string | null;
+}
+
+/**
+ * Selected document excerpts supplied to the assistant as grounded context.
+ * Chunks keep page and section metadata so answers can cite exact sources.
+ */
+export interface AIContextDocument {
+  id: string;
+  title: string;
+  format: string;
+  chunks: AIContextChunk[];
+}
+
 export interface AIChatInput {
   message: string;
   mode: AIAnswerMode;
   spaceName: string;
   spaceSubject: string;
   notes: AIContextNote[];
+  documents?: AIContextDocument[];
   history: AIConversationMessage[];
 }
 
 export interface AIChatResult {
   answer: string;
   citedNoteIds: string[];
+  citedChunkIds?: string[];
   usedExternalKnowledge: boolean;
+}
+
+
+export interface AIPerformanceTrend {
+  direction: string;
+  recentAccuracy: number | null;
+  previousAccuracy: number | null;
+  recentQuestions: number;
+  previousQuestions: number;
+}
+
+export interface AIPerformanceTopic {
+  topicId: string;
+  topicName: string;
+  accuracy: number | null;
+  answeredQuestions: number;
+  incorrectAnswers?: number;
+  repeatedMistakes?: number;
+  trend?: AIPerformanceTrend;
+  evidence?: string[];
+  revisionMemoryStrength?: number | null;
+}
+
+export interface AIPerformanceInput {
+  generatedAt: string;
+  range: {
+    from: string;
+    to: string;
+    days: number;
+  };
+  dataQuality: {
+    attemptCount: number;
+    answeredQuestions: number;
+    reliable: boolean;
+    insufficientData: string[];
+    limitations: string[];
+  };
+  overall: {
+    attemptCount: number;
+    answeredQuestions: number;
+    correctAnswers: number;
+    incorrectAnswers: number;
+    accuracy: number | null;
+    averageAttemptScore: number | null;
+    trend: AIPerformanceTrend;
+  };
+  subjects: Array<{
+    subject: string;
+    attemptCount: number;
+    answeredQuestions: number;
+    correctAnswers: number;
+    incorrectAnswers: number;
+    accuracy: number | null;
+    studyMinutes: number;
+  }>;
+  weakTopics: AIPerformanceTopic[];
+  strongTopics: AIPerformanceTopic[];
+  recentAttempts: Array<{
+    quizId: string;
+    quizTitle: string;
+    subject: string;
+    percentage: number;
+    answeredQuestions: number;
+    correctAnswers: number;
+    completedAt: string;
+  }>;
+  studyConsistency: {
+    totalStudyMinutes: number;
+    sessionCount: number;
+    activeDays: number;
+    daysInRange: number;
+    currentStreakDays: number;
+    availableMinutesPerWeek: number;
+    plannedMinutes: number;
+    completedMinutes: number;
+    planCompletionPercentage: number | null;
+    upcomingExams: Array<{
+      planName: string;
+      daysRemaining: number;
+      completionPercentage: number;
+      pendingTopicCount: number;
+    }>;
+  };
+  revision: {
+    trackedTopics: number;
+    dueNow: number;
+    needsRevision: number;
+    mastered: number;
+    reviewedInRange: number;
+    averageMemoryStrength: number | null;
+    masteredPercentage: number | null;
+  };
+  recommendations: Array<{
+    id: string;
+    title: string;
+    reason: string;
+    suggestedMinutes: number;
+    topicId: string;
+    alreadyScheduled: boolean;
+  }>;
+}
+
+export interface AIPerformancePracticeSuggestion {
+  title: string;
+  reason: string;
+  topicId: string | null;
+}
+
+export interface AIPerformanceInterpretation {
+  summary: string;
+  strengths: string[];
+  improvementAreas: string[];
+  trendInterpretation: string;
+  focusTopicIds: string[];
+  practiceSuggestions: AIPerformancePracticeSuggestion[];
 }
 
 /**
@@ -106,5 +241,6 @@ export interface IAIProvider {
   summarizeNote(input: AINoteInput): Promise<string>;
   generateQuiz(input: AIQuizInput): Promise<AIGeneratedQuestion[]>;
   interpretCommand(input: AICommandInput): Promise<AICommandInterpretation>;
+  interpretPerformance(input: AIPerformanceInput): Promise<AIPerformanceInterpretation>;
   chat(input: AIChatInput): Promise<AIChatResult>;
 }

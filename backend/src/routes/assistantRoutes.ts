@@ -5,6 +5,7 @@ import {
   assistantApplySchema,
   assistantChatSchema,
   assistantCommandSchema,
+  assistantPerformanceSchema,
 } from '../validation/schemas';
 import { validate } from '../validation/validate';
 
@@ -20,6 +21,11 @@ export const createAssistantRoutes = (
     '/chat',
     validate({ body: assistantChatSchema }),
     controller.chat,
+  );
+  router.post(
+    '/performance',
+    validate({ body: assistantPerformanceSchema }),
+    controller.performance,
   );
   router.post(
     '/command',

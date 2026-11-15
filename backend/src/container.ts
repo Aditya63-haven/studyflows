@@ -43,6 +43,7 @@ import { FlashcardService } from './services/FlashcardService';
 import { ImageProcessor } from './services/ImageProcessor';
 import { NoteService } from './services/NoteService';
 import { NotificationService } from './services/NotificationService';
+import { PerformanceAnalysisService } from './services/PerformanceAnalysisService';
 import { QuizService } from './services/QuizService';
 import { RevisionService } from './services/RevisionService';
 import { SearchService } from './services/SearchService';
@@ -66,6 +67,7 @@ export interface AppContainer {
   examPlanService: ExamPlanService;
   availabilityService: AvailabilityService;
   analyticsService: AnalyticsService;
+  performanceAnalysisService: PerformanceAnalysisService;
   notificationService: NotificationService;
   attentionService: AttentionService;
   aiAccessService: AiAccessService;
@@ -169,6 +171,8 @@ export const createContainer = (): AppContainer => {
   const assistantContextBuilder = new AssistantContextBuilder(
     studySpaceService,
     noteRepository,
+    documentRepository,
+    documentChunkRepository,
     config,
   );
 
@@ -181,6 +185,16 @@ export const createContainer = (): AppContainer => {
     quizRepository,
   );
   const revisionService = new RevisionService(revisionRepository, revisionStrategy);
+  const performanceAnalysisService = new PerformanceAnalysisService(
+    quizRepository,
+    attemptRepository,
+    spaceRepository,
+    sessionRepository,
+    revisionRepository,
+    examPlanRepository,
+    availabilityRepository,
+    revisionService,
+  );
   const notificationService = new NotificationService(notificationRepository);
   const availabilityService = new AvailabilityService(availabilityRepository);
 
@@ -248,6 +262,7 @@ export const createContainer = (): AppContainer => {
     examPlanService: new ExamPlanService(examPlanRepository, availabilityRepository),
     availabilityService,
     analyticsService,
+    performanceAnalysisService,
     notificationService,
     attentionService,
     aiAccessService,
@@ -259,6 +274,7 @@ export const createContainer = (): AppContainer => {
       aiAccessService,
       assistantContextBuilder,
       aiRateLimiter,
+      performanceAnalysisService,
       config,
     ),
     sharingService: new SharingService(sharedLinkRepository, noteRepository, quizRepository),

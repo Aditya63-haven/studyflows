@@ -9,6 +9,7 @@ import {
 } from '../api';
 import type { FlashcardDeck, Note, Quiz, StudySpace } from '../api/types';
 import { BookmarkButton } from '../components/BookmarkButton';
+import { DocumentLibrary } from '../components/DocumentLibrary';
 import { EmptyState } from '../components/EmptyState';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { Loading } from '../components/Loading';
@@ -106,6 +107,8 @@ export const SpaceDetailPage = () => {
       />
 
       <ErrorBanner message={error} onDismiss={() => setError(null)} />
+
+      <DocumentLibrary spaceId={space.id} />
 
       <section className="panel">
         <div className="section-heading">

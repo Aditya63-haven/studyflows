@@ -102,6 +102,12 @@ describe('invite-only AI access', () => {
       .expect(403);
 
     await request(app)
+      .post('/api/assistant/performance')
+      .set(auth(memberToken))
+      .send({ days: 30 })
+      .expect(403);
+
+    await request(app)
       .post(`/api/notes/${noteId}/condense`)
       .set(auth(memberToken))
       .expect(403);

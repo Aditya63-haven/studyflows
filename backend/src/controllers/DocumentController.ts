@@ -45,7 +45,7 @@ export class DocumentController {
       req.params.id,
     );
 
-    if (!(stream instanceof Object) || !('pipe' in stream)) {
+    if (typeof stream.pipe !== 'function') {
       throw new NotFoundError('Document file not found');
     }
 

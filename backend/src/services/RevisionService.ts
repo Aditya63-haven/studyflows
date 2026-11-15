@@ -8,6 +8,13 @@ import { IObserver } from '../domain/interfaces/IObserver';
 import { DomainEvent, QuizCompletedEvent } from '../patterns/observer/events';
 import { RevisionScheduleRepository } from '../repositories/RevisionScheduleRepository';
 
+export interface AddRecommendedRevisionInput {
+  topicId: string;
+  topicName: string;
+  memoryStrength?: number;
+  nextReviewAt?: Date;
+}
+
 export interface RevisionDashboard {
   dueToday: RevisionSchedule[];
   needsRevision: RevisionSchedule[];
@@ -66,6 +73,37 @@ export class RevisionService implements IObserver<DomainEvent> {
         mastered: mastered.length,
       },
     };
+  }
+
+  /**
+   * Adds a user-approved revision activity. Existing schedules are returned
+   * unchanged so recommendations cannot create duplicate tasks.
+   */
+  public async addRecommendedTopic(
+    userId: string,
+    input: AddRecommendedRevisionInput,
+    now: Date = new Date(),
+  ): Promise<{ schedule: RevisionSchedule; created: boolean }> {
+    const existing = await this.scheduleRepository.findByUserAndTopic(
+      userId,
+      input.topicId,
+    );
+    if (existing) {
+      return { schedule: existing, created: false };
+    }
+
+    const schedule = new RevisionSchedule({
+      userId,
+      topicId: input.topicId,
+      topicName: input.topicName,
+      memoryStrength: input.memoryStrength ?? 0,
+      easeFactor: 2.5,
+      intervalDays: 0,
+      reviewCount: 0,
+      lastReviewedAt: null,
+      nextReviewAt: input.nextReviewAt ?? now,
+    });
+    return { schedule: await this.scheduleRepository.create(schedule), created: true };
   }
 
   public async review(

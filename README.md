@@ -9,12 +9,15 @@ The project deliberately uses classes, inheritance, interfaces, design patterns 
 - JWT authentication with hashed passwords.
 - Study spaces for each subject, grouping notes, quizzes and flashcard decks.
 - Markdown notes with AI-assisted condensing and quiz generation.
-- Invite-only Gemini study assistant grounded in selected notes from a student's own spaces.
+- Document library per study space: upload PDF, DOCX, plain text or Markdown files, extract and chunk the text, then cite pages or sections in assistant answers.
+- Invite-only Gemini study assistant grounded in selected notes and documents from a student's own spaces.
 - Quizzes with MCQ, multi-select and true/false questions, automatic grading and stored attempts.
 - Flashcard decks with flip, shuffle and Again/Hard/Good/Easy review ratings.
 - Spaced-repetition scheduling with due-today, needs-revision and mastered views.
 - Exam plans generated day by day from exam date, subjects, study hours and topics.
 - Analytics for study time, streaks, quiz trends, weak topics and subject breakdowns.
+- Performance intelligence with deterministic accuracy, topic trends, weak/strong evidence, study consistency and data-quality limits.
+- Grounded AI performance interpretation with user-approved revision recommendations.
 - Public read-only sharing for notes and quizzes, including guest quiz attempts.
 - Bookmarks and global search across notes, quizzes and flashcard decks.
 - Deterministic mock AI provider, so no external API key is required.
@@ -112,9 +115,11 @@ AI_MODEL=gemini-3.8-flash
 AI_ACCESS_ADMIN_EMAIL=you@university.edu
 ```
 
-Register an account with exactly that admin email. The admin can open **Settings → AI access** and invite other student emails. Invites remain pending until that email registers; revoking access takes effect immediately. Chat, note condensing, quiz generation and assistant planning commands all require access. Assistant requests are rate limited per user and globally using the limits in `.env.example`.
+Register an account with exactly that admin email. The admin can open **Settings → AI access** and invite other student emails. Invites remain pending until that email registers; revoking access takes effect immediately. Chat, note condensing, quiz generation, assistant planning commands and performance interpretation all require access. Assistant requests are rate limited per user and globally using the limits in `.env.example`.
 
 Profile pictures are written to `AVATAR_STORAGE_DIR` (resolved from the backend working directory) and served back through opaque URLs. The directory must be writable by the API and kept on persistent storage. A single local disk is not suitable for multiple backend instances unless the directory is a shared volume; for horizontal deployments, replace `LocalAvatarStorage` with an object-storage implementation of `IAvatarStorage`.
+
+Uploaded study documents are stored in `DOCUMENT_STORAGE_DIR` with the same persistence considerations. Upload limits and extraction behaviour are configured with `DOCUMENT_MAX_BYTES`, `DOCUMENT_MAX_PAGES`, `DOCUMENT_MAX_EXTRACTED_CHARS`, `DOCUMENT_CHUNK_SIZE`, `DOCUMENT_CHUNK_OVERLAP` and `DOCUMENT_MAX_CHUNKS`. `AI_MAX_DOCUMENT_CONTEXT_CHARS` caps how much document text is sent to the assistant.
 
 Start the API:
 
@@ -178,6 +183,8 @@ The Jest suite includes:
 - Unit tests for every question subtype, mixed quiz grading, the question factory, both revision strategies, the exam-plan builder, error classes, the observer flow and singleton configuration.
 - An API integration test that registers and logs in a user, creates a study space and quiz, submits an attempt and verifies the score.
 - Gemini adapter, AI access, assistant chat and rate-limit tests; the Gemini SDK is mocked and no real API calls are made.
+- Document processing tests for validation, size limits, extraction, chunk page references and empty files, plus API tests for upload, download, ownership, assistant grounding and deletion cleanup.
+- Performance-analysis unit tests for accuracy, trends, weak/strong classification, data-quality limits and recommendation acceptance, plus API tests for the deterministic report, idempotent recommendation acceptance and grounded AI interpretation.
 - `mongodb-memory-server` provides an isolated database for integration tests, so no local test database is required.
 
 Other backend checks:
@@ -243,6 +250,16 @@ Authorization: Bearer <token>
 | POST   | `/notes/:id/condense`      | Generate an AI summary      |
 | POST   | `/notes/:id/generate-quiz` | Generate a quiz from a note |
 
+### Documents
+
+| Method | Endpoint                       | Description                                                               |
+| ------ | ------------------------------ | ------------------------------------------------------------------------- |
+| GET    | `/spaces/:spaceId/documents`   | List documents in a space with processing status                          |
+| POST   | `/spaces/:spaceId/documents`   | Upload a PDF, DOCX, TXT or MD file (multipart field `file`)               |
+| GET    | `/documents/:id`               | Get document metadata and chunks                                          |
+| GET    | `/documents/:id/file`          | Download the original stored file                                         |
+| DELETE | `/documents/:id`               | Delete a document, its chunks and the stored file                         |
+
 ### Quizzes and attempts
 
 | Method | Endpoint                | Description                 |
@@ -276,6 +293,8 @@ Authorization: Bearer <token>
 | DELETE | `/exam-plans/:id`                          | Delete an exam plan        |
 | POST   | `/exam-plans/:id/topics/:topicId/complete` | Mark a topic complete      |
 | GET    | `/analytics`                               | Get the analytics overview |
+| GET    | `/analytics/performance`                   | Deterministic performance report with filters (`days`, `from`, `to`, `subject`, `spaceId`) |
+| POST   | `/analytics/performance/recommendations/:id/accept` | Add one recommended revision activity idempotently |
 | GET    | `/sessions`                                | List study sessions        |
 | POST   | `/sessions`                                | Record a study session     |
 
@@ -291,7 +310,8 @@ Authorization: Bearer <token>
 | GET    | `/attention`                   | Missed sessions and approaching exams with fixes  |
 | POST   | `/attention/:itemId/apply`     | Apply a reschedule suggestion (`next-free-slot` or `weekend`) |
 | POST   | `/assistant/command`           | Interpret a natural-language planning command     |
-| POST   | `/assistant/chat`              | Ask Gemini using selected notes from your spaces  |
+| POST   | `/assistant/chat`              | Ask Gemini using selected notes and documents (`documentIds`) |
+| POST   | `/assistant/performance`       | Interpret measured performance with the configured AI provider |
 | POST   | `/assistant/apply`             | Confirm and apply a proposed move of study work    |
 
 ### AI access

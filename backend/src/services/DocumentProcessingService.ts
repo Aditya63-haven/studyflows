@@ -400,8 +400,8 @@ export class DocumentProcessingService {
   private static normalizeText(text: string): string {
     return text
       .replace(/\r\n?/g, '\n')
-      .replace(/\u000c/g, '\n')
-      .replace(/\u00a0/g, ' ')
+      .replaceAll('\u000c', '\n')
+      .replaceAll('\u00a0', ' ')
       .replace(/[\u200b-\u200d\ufeff]/g, '')
       .split('\n')
       .map((line) => line.replace(/[ \t]+$/g, ''))
@@ -438,9 +438,13 @@ export class DocumentProcessingService {
 
   private static sanitizeFileName(value: string): string {
     const base = value.replace(/\\/g, '/').split('/').pop() ?? '';
-    const cleaned = base
-      .normalize('NFKC')
-      .replace(/[\u0000-\u001f\u007f<>:"/\\|?*]/g, '_')
+    const cleaned = Array.from(base.normalize('NFKC'))
+      .map((char) => {
+        const code = char.codePointAt(0) ?? 0;
+        const unsafe = code < 0x20 || code === 0x7f || '<>:"/\\|?*'.includes(char);
+        return unsafe ? '_' : char;
+      })
+      .join('')
       .replace(/\s+/g, ' ')
       .replace(/^\.+/, '')
       .trim()

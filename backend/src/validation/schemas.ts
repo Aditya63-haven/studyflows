@@ -213,6 +213,7 @@ export const assistantChatSchema = z.object({
   mode: z.enum(['answer', 'explain', 'summary', 'detailed']).default('answer'),
   spaceId: z.string().trim().min(1).nullable().optional(),
   noteIds: z.array(z.string().trim().min(1)).max(50).optional(),
+  documentIds: z.array(z.string().trim().min(1)).max(20).optional(),
   history: z
     .array(
       z.object({
@@ -223,6 +224,23 @@ export const assistantChatSchema = z.object({
     .max(20)
     .default([]),
 });
+
+
+export const performanceFiltersSchema = z
+  .object({
+    days: z.coerce.number().int().min(1).max(3650).optional(),
+    from: z.coerce.date().optional(),
+    to: z.coerce.date().optional(),
+    subject: z.string().trim().min(1).max(120).optional(),
+    spaceId: z.string().trim().min(1).optional(),
+  })
+  .refine(
+    (value) =>
+      !value.from || !value.to || value.from.getTime() <= value.to.getTime(),
+    { message: 'from must be before or equal to to', path: ['from'] },
+  );
+
+export const assistantPerformanceSchema = performanceFiltersSchema;
 
 export const aiAccessGrantSchema = z.object({
   email: z.string().trim().email(),

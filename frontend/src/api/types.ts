@@ -36,6 +36,26 @@ export interface Note {
   updatedAt: string;
 }
 
+export type DocumentFormat = 'pdf' | 'docx' | 'txt' | 'md';
+export type DocumentStatus = 'processing' | 'ready' | 'failed';
+
+export interface StudyDocument {
+  id: string;
+  type: 'document';
+  spaceId: string;
+  originalName: string;
+  format: DocumentFormat;
+  mimeType: string;
+  sizeBytes: number;
+  status: DocumentStatus;
+  errorMessage: string | null;
+  pageCount: number;
+  characterCount: number;
+  chunkCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type QuestionType = 'mcq' | 'multi_select' | 'true_false';
 
 export interface QuestionOption {
@@ -428,6 +448,7 @@ export interface AssistantChatInput {
   mode: AssistantChatMode;
   spaceId: string | null;
   noteIds: string[];
+  documentIds: string[];
   history: AssistantConversationMessage[];
 }
 
@@ -436,10 +457,234 @@ export interface AssistantCitation {
   title: string;
 }
 
+export interface AssistantDocumentCitation {
+  id: string;
+  documentId: string;
+  title: string;
+  pageNumber: number | null;
+  section: string | null;
+  excerpt: string;
+}
+
 export interface AssistantChatResult {
   answer: string;
   provider: string;
   citations: AssistantCitation[];
+  documentCitations: AssistantDocumentCitation[];
   usedExternalKnowledge: boolean;
   noteCount: number;
+  documentCount: number;
+}
+
+export type PerformanceTrendDirection =
+  | 'improving'
+  | 'declining'
+  | 'stable'
+  | 'insufficient';
+
+export interface PerformanceTrend {
+  direction: PerformanceTrendDirection;
+  recentAccuracy: number | null;
+  previousAccuracy: number | null;
+  recentQuestions: number;
+  previousQuestions: number;
+}
+
+export interface SubjectPerformance {
+  subject: string;
+  spaceId: string | null;
+  spaceName: string;
+  attemptCount: number;
+  answeredQuestions: number;
+  correctAnswers: number;
+  incorrectAnswers: number;
+  accuracy: number | null;
+  studyMinutes: number;
+  lastAttemptAt: string | null;
+}
+
+export type TopicClassification = 'weak' | 'strong' | 'neutral' | 'insufficient';
+
+export interface TopicPerformance {
+  topicId: string;
+  topicName: string;
+  subject: string;
+  spaceId: string | null;
+  attemptCount: number;
+  answeredQuestions: number;
+  correctAnswers: number;
+  incorrectAnswers: number;
+  accuracy: number | null;
+  repeatedMistakes: number;
+  trend: PerformanceTrend;
+  classification: TopicClassification;
+  evidence: string[];
+  revisionMemoryStrength: number | null;
+  revisionStatus: RevisionStatus | null;
+  lastAttemptAt: string | null;
+}
+
+export interface PerformanceAttempt {
+  id: string;
+  quizId: string;
+  quizTitle: string;
+  subject: string;
+  spaceId: string | null;
+  percentage: number;
+  answeredQuestions: number;
+  correctAnswers: number;
+  incorrectAnswers: number;
+  completedAt: string;
+}
+
+export interface PendingPlanTopic {
+  planId: string;
+  planName: string;
+  topicId: string;
+  topicName: string;
+  examDate: string;
+  daysRemaining: number;
+  estimatedMinutes: number;
+  scheduledDate: string | null;
+}
+
+export interface UpcomingExam {
+  planId: string;
+  planName: string;
+  examDate: string;
+  daysRemaining: number;
+  completionPercentage: number;
+  pendingTopicCount: number;
+}
+
+export interface StudyConsistency {
+  totalStudyMinutes: number;
+  sessionCount: number;
+  activeDays: number;
+  daysInRange: number;
+  activeDayPercentage: number;
+  averageSessionMinutes: number;
+  currentStreakDays: number;
+  longestStreakDays: number;
+  availableMinutesPerWeek: number;
+  availabilitySource: 'saved' | 'default';
+  plannedMinutes: number;
+  completedMinutes: number;
+  plannedTopicSlots: number;
+  completedTopicSlots: number;
+  planCompletionPercentage: number | null;
+  upcomingExams: UpcomingExam[];
+  pendingPlanTopics: PendingPlanTopic[];
+}
+
+export interface PerformanceRevisionMetrics {
+  trackedTopics: number;
+  dueNow: number;
+  needsRevision: number;
+  mastered: number;
+  reviewedInRange: number;
+  averageMemoryStrength: number | null;
+  masteredPercentage: number | null;
+}
+
+export interface PerformanceDataQuality {
+  attemptCount: number;
+  answeredQuestions: number;
+  minimumQuestionsForClassification: number;
+  reliable: boolean;
+  insufficientData: string[];
+  limitations: string[];
+}
+
+export interface PerformanceAnalysis {
+  generatedAt: string;
+  range: { from: string; to: string; days: number };
+  filters: { subject: string | null; spaceId: string | null };
+  dataQuality: PerformanceDataQuality;
+  overall: {
+    attemptCount: number;
+    answeredQuestions: number;
+    correctAnswers: number;
+    incorrectAnswers: number;
+    accuracy: number | null;
+    averageAttemptScore: number | null;
+    reliable: boolean;
+    trend: PerformanceTrend;
+  };
+  subjects: SubjectPerformance[];
+  topics: TopicPerformance[];
+  weakTopics: TopicPerformance[];
+  strongTopics: TopicPerformance[];
+  attempts: PerformanceAttempt[];
+  studyConsistency: StudyConsistency;
+  revision: PerformanceRevisionMetrics;
+}
+
+export type RecommendationType =
+  | 'weak-topic'
+  | 'due-revision'
+  | 'low-memory'
+  | 'exam-topic';
+
+export interface RevisionRecommendation {
+  id: string;
+  type: RecommendationType;
+  title: string;
+  description: string;
+  reason: string;
+  evidence: string[];
+  suggestedMinutes: number;
+  topicId: string;
+  topicName: string;
+  priority: 'high' | 'medium' | 'low';
+  examDate: string | null;
+  alreadyScheduled: boolean;
+  addable: boolean;
+}
+
+export interface PerformanceReport {
+  analysis: PerformanceAnalysis;
+  recommendations: RevisionRecommendation[];
+}
+
+export interface PerformanceFilters {
+  days?: number;
+  from?: string;
+  to?: string;
+  subject?: string;
+  spaceId?: string;
+}
+
+export interface AssistantPerformanceFocus {
+  topicId: string;
+  topicName: string;
+  accuracy: number | null;
+  answeredQuestions: number;
+  evidence: string[];
+}
+
+export interface AssistantPerformanceSuggestion {
+  title: string;
+  reason: string;
+  topicId: string | null;
+  topicName: string | null;
+}
+
+export interface AssistantPerformanceResult {
+  provider: string;
+  generatedAt: string;
+  summary: string;
+  strengths: string[];
+  improvementAreas: string[];
+  trendInterpretation: string;
+  focusTopics: AssistantPerformanceFocus[];
+  practiceSuggestions: AssistantPerformanceSuggestion[];
+  recommendations: RevisionRecommendation[];
+  dataQuality: {
+    reliable: boolean;
+    attemptCount: number;
+    answeredQuestions: number;
+    insufficientData: string[];
+    limitations: string[];
+  };
 }

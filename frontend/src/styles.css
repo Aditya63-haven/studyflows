@@ -545,6 +545,70 @@ a.wordmark:hover {
   margin-top: auto;
 }
 
+.document-upload {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.9rem;
+}
+
+.document-upload input[type='file'] {
+  max-width: 100%;
+}
+
+.document-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.document-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+
+.document-row-main {
+  min-width: 0;
+}
+
+.document-row-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.document-row-title strong {
+  overflow-wrap: anywhere;
+}
+
+.document-row-main p {
+  margin: 0.25rem 0 0;
+}
+
+.document-row .card-actions {
+  flex: 0 0 auto;
+}
+
+.document-error {
+  color: var(--danger-text);
+  font-size: 0.8rem;
+}
+
+@media (max-width: 640px) {
+  .document-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
 .space-card {
   display: flex;
   min-height: 230px;
@@ -2043,4 +2107,56 @@ input[type='number'] {
   .day-tabs {
     grid-template-columns: repeat(2, 1fr);
   }
+}
+
+.performance-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+.inset-panel {
+  border-color: var(--border);
+  background: var(--surface-2);
+}
+
+.evidence-list {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.recommendation-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+
+.recommendation-card p {
+  margin: 0;
+}
+
+.recommendation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.badge.priority-high {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.badge.priority-medium {
+  border-color: var(--accent);
+  color: var(--accent);
 }

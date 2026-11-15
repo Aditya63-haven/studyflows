@@ -7,6 +7,8 @@ import {
   AIGeneratedQuestion,
   AINoteInput,
   AIQuizInput,
+  AIPerformanceInput,
+  AIPerformanceInterpretation,
   IAIProvider,
 } from '../../domain/interfaces/IAIProvider';
 import { RescheduleStrategyName } from '../../domain/interfaces/IRescheduleStrategy';
@@ -86,11 +88,11 @@ export class MockAIProvider implements IAIProvider {
    * to the weekend / next free slot" style commands.
    */
   /**
-   * Deterministic note-grounded answers used by tests and local development.
+   * Deterministic context-grounded answers used by tests and local development.
    */
   public async chat(input: AIChatInput): Promise<AIChatResult> {
     const keywords = MockAIProvider.extractKeywords(input.message, 12);
-    const ranked = input.notes
+    const rankedNotes = input.notes
       .map((note) => ({
         note,
         score: MockAIProvider.scoreNote(note.title, note.content, keywords),
@@ -99,17 +101,47 @@ export class MockAIProvider implements IAIProvider {
       .sort((left, right) => right.score - left.score)
       .slice(0, 3);
 
-    if (ranked.length === 0) {
+    const documents = input.documents ?? [];
+    let rankedChunks = documents
+      .flatMap((document) =>
+        document.chunks.map((chunk) => ({
+          document,
+          chunk,
+          score: MockAIProvider.scoreChunk(
+            document.title,
+            chunk.text,
+            chunk.section,
+            keywords,
+          ),
+        })),
+      )
+      .filter((entry) => entry.score > 0)
+      .sort((left, right) => right.score - left.score)
+      .slice(0, 4);
+
+    if (rankedChunks.length === 0 && documents.length > 0) {
+      rankedChunks = documents
+        .flatMap((document) =>
+          document.chunks.slice(0, 1).map((chunk) => ({
+            document,
+            chunk,
+            score: 0,
+          })),
+        )
+        .slice(0, 2);
+    }
+
+    if (rankedNotes.length === 0 && rankedChunks.length === 0) {
       return {
         answer:
-          "I couldn't find a matching note in the selected study context. Select or add a relevant note for a grounded answer, or ask a broader question about the material you have included.",
+          "I couldn't find matching material in the selected study context. Select or add a relevant note or document for a grounded answer, or ask a broader question about the material you have included.",
         citedNoteIds: [],
+        citedChunkIds: [],
         usedExternalKnowledge: false,
       };
     }
 
-    const citations = ranked.map(({ note }) => note.id);
-    const snippets = ranked.map(({ note }) => {
+    const noteSnippets = rankedNotes.map(({ note }) => {
       const sentences = MockAIProvider.extractSentences(note.content);
       const relevant = sentences.find((sentence) =>
         keywords.some((keyword) => sentence.toLowerCase().includes(keyword)),
@@ -121,23 +153,115 @@ export class MockAIProvider implements IAIProvider {
       };
     });
 
+    const chunkSnippets = rankedChunks.map(({ document, chunk }) => {
+      const location = [
+        chunk.section,
+        chunk.pageNumber ? `page ${chunk.pageNumber}` : '',
+      ]
+        .filter(Boolean)
+        .join(', ');
+      return {
+        title: location ? `${document.title} (${location})` : document.title,
+        text: MockAIProvider.truncate(chunk.text, 320),
+      };
+    });
+
+    const hasNotes = noteSnippets.length > 0;
     const opening =
       input.mode === 'summary'
         ? `Here is a concise summary from ${input.spaceName}:`
         : input.mode === 'explain'
-          ? 'Here is an explanation grounded in your selected notes:'
+          ? 'Here is an explanation grounded in your selected material:'
           : input.mode === 'detailed'
-            ? 'Here is a detailed answer drawn from your selected notes:'
-            : 'Based on your selected notes:';
+            ? 'Here is a detailed answer drawn from your selected material:'
+            : hasNotes && chunkSnippets.length === 0
+              ? 'Based on your selected notes:'
+              : 'Based on your selected material:';
 
-    const body = snippets
+    const body = [...noteSnippets, ...chunkSnippets]
       .map((snippet) => `- **${snippet.title}**: ${snippet.text}`)
       .join('\n');
 
     return {
       answer: `${opening}\n\n${body}`,
-      citedNoteIds: citations,
+      citedNoteIds: rankedNotes.map(({ note }) => note.id),
+      citedChunkIds: rankedChunks.map(({ chunk }) => chunk.id),
       usedExternalKnowledge: false,
+    };
+  }
+
+
+  public async interpretPerformance(
+    input: AIPerformanceInput,
+  ): Promise<AIPerformanceInterpretation> {
+    if (!input.dataQuality.reliable || input.overall.answeredQuestions === 0) {
+      return {
+        summary:
+          'There is not enough graded quiz activity in this period to interpret performance reliably. Complete a few quizzes and try again.',
+        strengths: [],
+        improvementAreas: [],
+        trendInterpretation:
+          'A trend needs at least two comparable groups of quiz answers.',
+        focusTopicIds: [],
+        practiceSuggestions: [],
+      };
+    }
+
+    const accuracy = input.overall.accuracy ?? 0;
+    const strengths =
+      input.strongTopics.length > 0
+        ? input.strongTopics
+            .slice(0, 3)
+            .map(
+              (topic) =>
+                `${topic.topicName}: ${topic.accuracy ?? 0}% accuracy across ${topic.answeredQuestions} questions.`,
+            )
+        : input.subjects
+            .filter((subject) => (subject.accuracy ?? 0) >= 70)
+            .slice(0, 3)
+            .map(
+              (subject) =>
+                `${subject.subject} is a relative strength at ${subject.accuracy ?? 0}% accuracy.`,
+            );
+
+    const improvementAreas = input.weakTopics.slice(0, 3).map((topic) => {
+      const evidence = topic.evidence?.[0];
+      return `${topic.topicName}: ${evidence ?? `accuracy is ${topic.accuracy ?? 0}%.`}`;
+    });
+
+    const trendInterpretation =
+      input.overall.trend.direction === 'improving'
+        ? `Accuracy improved from ${input.overall.trend.previousAccuracy ?? 0}% to ${input.overall.trend.recentAccuracy ?? 0}% in recent attempts.`
+        : input.overall.trend.direction === 'declining'
+          ? `Accuracy dropped from ${input.overall.trend.previousAccuracy ?? 0}% to ${input.overall.trend.recentAccuracy ?? 0}% in recent attempts.`
+          : input.overall.trend.direction === 'stable'
+            ? `Accuracy is stable at about ${input.overall.trend.recentAccuracy ?? accuracy}%.`
+            : 'There is not enough attempt history to establish a trend.';
+
+    const focusTopicIds = input.weakTopics.slice(0, 3).map((topic) => topic.topicId);
+    const practiceSuggestions = input.weakTopics.slice(0, 3).map((topic) => ({
+      title: `Practice ${topic.topicName}`,
+      reason:
+        topic.evidence?.[0] ??
+        `Targeted practice should raise ${topic.accuracy ?? 0}% accuracy.`,
+      topicId: topic.topicId,
+    }));
+
+    const summary = [
+      `You answered ${input.overall.answeredQuestions} graded questions across ${input.overall.attemptCount} attempts with ${accuracy}% accuracy.`,
+      input.weakTopics.length > 0
+        ? `${input.weakTopics.length} topic${input.weakTopics.length === 1 ? '' : 's'} need attention.`
+        : 'No topic currently meets the weak-topic criteria.',
+      `You studied ${input.studyConsistency.totalStudyMinutes} minutes in this period.`,
+    ].join(' ');
+
+    return {
+      summary: MockAIProvider.truncate(summary, 600),
+      strengths,
+      improvementAreas,
+      trendInterpretation,
+      focusTopicIds,
+      practiceSuggestions,
     };
   }
 
@@ -353,6 +477,26 @@ export class MockAIProvider implements IAIProvider {
       const titleMatch = normalizedTitle.includes(keyword) ? 4 : 0;
       const contentMatches = normalizedContent.split(keyword).length - 1;
       return score + titleMatch + Math.min(contentMatches, 3);
+    }, 0);
+  }
+
+  private static scoreChunk(
+    title: string,
+    text: string,
+    section: string | null,
+    keywords: string[],
+  ): number {
+    if (keywords.length === 0) {
+      return 0;
+    }
+    const normalizedTitle = title.toLowerCase();
+    const normalizedSection = section?.toLowerCase() ?? '';
+    const normalizedText = text.toLowerCase();
+    return keywords.reduce((score, keyword) => {
+      const titleMatch = normalizedTitle.includes(keyword) ? 4 : 0;
+      const sectionMatch = normalizedSection.includes(keyword) ? 3 : 0;
+      const contentMatches = normalizedText.split(keyword).length - 1;
+      return score + titleMatch + sectionMatch + Math.min(contentMatches, 3);
     }, 0);
   }
 

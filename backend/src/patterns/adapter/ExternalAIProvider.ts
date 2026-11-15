@@ -7,6 +7,9 @@ import {
   AIGeneratedQuestion,
   AINoteInput,
   AIQuizInput,
+  AIPerformanceInput,
+  AIPerformanceInterpretation,
+  AIPerformancePracticeSuggestion,
   IAIProvider,
 } from '../../domain/interfaces/IAIProvider';
 
@@ -20,6 +23,10 @@ interface QuizResponse {
 
 interface CommandResponse {
   interpretation?: AICommandInterpretation;
+}
+
+interface PerformanceResponse {
+  interpretation?: AIPerformanceInterpretation;
 }
 
 /**
@@ -71,7 +78,62 @@ export class ExternalAIProvider implements IAIProvider {
       citedNoteIds: response.citedNoteIds.filter(
         (id): id is string => typeof id === 'string',
       ),
+      citedChunkIds: Array.isArray(response.citedChunkIds)
+        ? response.citedChunkIds.filter((id): id is string => typeof id === 'string')
+        : [],
       usedExternalKnowledge: response.usedExternalKnowledge,
+    };
+  }
+
+
+  public async interpretPerformance(
+    input: AIPerformanceInput,
+  ): Promise<AIPerformanceInterpretation> {
+    const response = await this.post<PerformanceResponse>(
+      '/interpret-performance',
+      input,
+    );
+    const interpretation = response.interpretation;
+    if (
+      !interpretation ||
+      typeof interpretation.summary !== 'string' ||
+      interpretation.summary.trim().length === 0 ||
+      typeof interpretation.trendInterpretation !== 'string'
+    ) {
+      throw new AppError(
+        'External AI provider returned an invalid performance interpretation',
+        502,
+        false,
+      );
+    }
+
+    const strings = (value: unknown): string[] =>
+      Array.isArray(value)
+        ? value
+            .filter((item): item is string => typeof item === 'string')
+            .slice(0, 3)
+        : [];
+    const suggestions = Array.isArray(interpretation.practiceSuggestions)
+      ? interpretation.practiceSuggestions
+          .filter(
+            (item): item is AIPerformancePracticeSuggestion =>
+              Boolean(item) &&
+              typeof item.title === 'string' &&
+              item.title.trim().length > 0 &&
+              typeof item.reason === 'string' &&
+              item.reason.trim().length > 0 &&
+              (item.topicId === null || typeof item.topicId === 'string'),
+          )
+          .slice(0, 3)
+      : [];
+
+    return {
+      summary: interpretation.summary.trim(),
+      strengths: strings(interpretation.strengths),
+      improvementAreas: strings(interpretation.improvementAreas),
+      trendInterpretation: interpretation.trendInterpretation.trim(),
+      focusTopicIds: strings(interpretation.focusTopicIds),
+      practiceSuggestions: suggestions,
     };
   }
 

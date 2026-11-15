@@ -1,6 +1,7 @@
 export { authApi } from './auth';
 export { spacesApi } from './spaces';
 export { notesApi } from './notes';
+export { documentsApi } from './documents';
 export { quizzesApi } from './quizzes';
 export { flashcardsApi } from './flashcards';
 export { revisionApi } from './revision';

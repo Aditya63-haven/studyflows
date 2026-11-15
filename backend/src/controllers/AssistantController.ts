@@ -4,6 +4,7 @@ import {
   AssistantChatInput,
   AssistantService,
 } from '../services/AssistantService';
+import { PerformanceFilters } from '../services/PerformanceAnalysisService';
 import { authContext } from '../utils/authContext';
 import { Serializer } from '../utils/serializers';
 
@@ -18,6 +19,15 @@ export class AssistantController {
     const result = await this.assistantService.chat(
       userId,
       req.body as AssistantChatInput,
+    );
+    res.status(200).json({ result });
+  });
+
+  public performance = asyncHandler(async (req: Request, res: Response) => {
+    const { userId } = authContext(req);
+    const result = await this.assistantService.analyzePerformance(
+      userId,
+      req.body as PerformanceFilters,
     );
     res.status(200).json({ result });
   });

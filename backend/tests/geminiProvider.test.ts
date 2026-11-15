@@ -135,3 +135,142 @@ describe('GeminiAIProvider', () => {
     ).rejects.toMatchObject({ statusCode: 429 });
   });
 });
+
+const performanceInput = {
+  generatedAt: '2026-05-15T12:00:00.000Z',
+  range: { from: '2026-04-16T00:00:00.000Z', to: '2026-05-15T23:59:59.999Z', days: 30 },
+  dataQuality: {
+    attemptCount: 2,
+    answeredQuestions: 10,
+    reliable: true,
+    insufficientData: [],
+    limitations: ['Quiz questions do not store curriculum topic tags.'],
+  },
+  overall: {
+    attemptCount: 2,
+    answeredQuestions: 10,
+    correctAnswers: 4,
+    incorrectAnswers: 6,
+    accuracy: 40,
+    averageAttemptScore: 40,
+    trend: {
+      direction: 'declining',
+      recentAccuracy: 30,
+      previousAccuracy: 50,
+      recentQuestions: 5,
+      previousQuestions: 5,
+    },
+  },
+  subjects: [
+    {
+      subject: 'Mathematics',
+      attemptCount: 2,
+      answeredQuestions: 10,
+      correctAnswers: 4,
+      incorrectAnswers: 6,
+      accuracy: 40,
+      studyMinutes: 90,
+    },
+  ],
+  weakTopics: [
+    {
+      topicId: 'quiz-1',
+      topicName: 'Algebra',
+      accuracy: 40,
+      answeredQuestions: 10,
+      incorrectAnswers: 6,
+      repeatedMistakes: 2,
+      trend: {
+        direction: 'declining',
+        recentAccuracy: 30,
+        previousAccuracy: 50,
+        recentQuestions: 5,
+        previousQuestions: 5,
+      },
+      evidence: ['4/10 questions correct (40% accuracy).'],
+      revisionMemoryStrength: null,
+    },
+  ],
+  strongTopics: [],
+  recentAttempts: [],
+  studyConsistency: {
+    totalStudyMinutes: 90,
+    sessionCount: 2,
+    activeDays: 2,
+    daysInRange: 30,
+    currentStreakDays: 1,
+    availableMinutesPerWeek: 600,
+    plannedMinutes: 0,
+    completedMinutes: 0,
+    planCompletionPercentage: null,
+    upcomingExams: [],
+  },
+  revision: {
+    trackedTopics: 0,
+    dueNow: 0,
+    needsRevision: 0,
+    mastered: 0,
+    reviewedInRange: 0,
+    averageMemoryStrength: null,
+    masteredPercentage: null,
+  },
+  recommendations: [
+    {
+      id: 'weak:quiz-1',
+      title: 'Revise Algebra',
+      reason: '4/10 questions correct (40% accuracy).',
+      suggestedMinutes: 25,
+      topicId: 'quiz-1',
+      alreadyScheduled: false,
+    },
+  ],
+};
+
+describe('GeminiAIProvider performance interpretation', () => {
+  it('parses and sanitizes performance interpretation JSON', async () => {
+    const { provider, generateContent } = makeProvider();
+    generateContent.mockResolvedValue({
+      text: JSON.stringify({
+        summary: 'Accuracy is low and declining.',
+        strengths: ['Persistence', 'Persistence'],
+        improvementAreas: ['Algebra'],
+        trendInterpretation: 'Recent accuracy fell from 50% to 30%.',
+        focusTopicIds: ['quiz-1', 'quiz-1', 'not-owned'],
+        practiceSuggestions: [
+          { title: 'Practice equations', reason: 'Low accuracy.', topicId: 'quiz-1' },
+          { title: 'Invalid', reason: 'Bad topic id.', topicId: 'not-owned' },
+          { title: '', reason: 'Missing title.', topicId: null },
+          { title: 'Review worked examples', reason: 'Build confidence.', topicId: null },
+        ],
+      }),
+    });
+
+    const result = await provider.interpretPerformance(performanceInput);
+
+    expect(result.summary).toBe('Accuracy is low and declining.');
+    expect(result.strengths).toEqual(['Persistence']);
+    expect(result.focusTopicIds).toEqual(['quiz-1', 'not-owned']);
+    expect(result.practiceSuggestions).toEqual([
+      { title: 'Practice equations', reason: 'Low accuracy.', topicId: 'quiz-1' },
+      { title: 'Invalid', reason: 'Bad topic id.', topicId: 'not-owned' },
+      { title: 'Review worked examples', reason: 'Build confidence.', topicId: null },
+    ]);
+    expect(generateContent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        contents: expect.stringContaining('quiz-1'),
+      }),
+    );
+  });
+
+  it('rejects invalid performance interpretation payloads', async () => {
+    const { provider, generateContent } = makeProvider();
+    generateContent.mockResolvedValue({
+      text: JSON.stringify({ summary: '', trendInterpretation: 'No summary.' }),
+    });
+
+    await expect(provider.interpretPerformance(performanceInput)).rejects.toMatchObject({
+      name: 'AppError',
+      statusCode: 502,
+    });
+  });
+});

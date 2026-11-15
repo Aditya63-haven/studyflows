@@ -11,6 +11,11 @@ import { RescheduleStrategyName } from '../domain/interfaces/IRescheduleStrategy
 import { AppliedChange, AttentionSuggestionView } from './AttentionService';
 import { AttentionService } from './AttentionService';
 import { AiAccessService } from './AiAccessService';
+import {
+  PerformanceAnalysisService,
+  PerformanceFilters,
+  RevisionRecommendation,
+} from './PerformanceAnalysisService';
 import { AiRateLimiter } from './AiRateLimiter';
 import { AssistantContextBuilder } from './AssistantContextBuilder';
 import { ExamPlanRepository } from '../repositories/ExamPlanRepository';
@@ -32,6 +37,7 @@ export interface AssistantChatInput {
   mode: AIAnswerMode;
   spaceId?: string | null;
   noteIds?: string[];
+  documentIds?: string[];
   history: AIConversationMessage[];
 }
 
@@ -40,12 +46,57 @@ export interface AssistantCitation {
   title: string;
 }
 
+export interface AssistantDocumentCitation {
+  id: string;
+  documentId: string;
+  title: string;
+  pageNumber: number | null;
+  section: string | null;
+  excerpt: string;
+}
+
+export interface AssistantPerformanceFocus {
+  topicId: string;
+  topicName: string;
+  accuracy: number | null;
+  answeredQuestions: number;
+  evidence: string[];
+}
+
+export interface AssistantPerformanceSuggestion {
+  title: string;
+  reason: string;
+  topicId: string | null;
+  topicName: string | null;
+}
+
+export interface AssistantPerformanceResponse {
+  provider: string;
+  generatedAt: Date;
+  summary: string;
+  strengths: string[];
+  improvementAreas: string[];
+  trendInterpretation: string;
+  focusTopics: AssistantPerformanceFocus[];
+  practiceSuggestions: AssistantPerformanceSuggestion[];
+  recommendations: RevisionRecommendation[];
+  dataQuality: {
+    reliable: boolean;
+    attemptCount: number;
+    answeredQuestions: number;
+    insufficientData: string[];
+    limitations: string[];
+  };
+}
+
 export interface AssistantChatResponse {
   answer: string;
   provider: string;
   citations: AssistantCitation[];
+  documentCitations: AssistantDocumentCitation[];
   usedExternalKnowledge: boolean;
   noteCount: number;
+  documentCount: number;
 }
 
 /**
@@ -64,6 +115,7 @@ export class AssistantService {
     private readonly aiAccessService: AiAccessService,
     private readonly contextBuilder: AssistantContextBuilder,
     private readonly rateLimiter: AiRateLimiter,
+    private readonly performanceAnalysisService: PerformanceAnalysisService,
     private readonly config: Config,
   ) {}
 
@@ -82,6 +134,8 @@ export class AssistantService {
       userId,
       input.spaceId,
       input.noteIds,
+      input.documentIds,
+      input.message,
     );
     const result = await this.aiProvider.chat({
       message: input.message,
@@ -89,6 +143,7 @@ export class AssistantService {
       spaceName: context.spaceName,
       spaceSubject: context.spaceSubject,
       notes: context.notes,
+      documents: context.documents,
       history: input.history.slice(-this.config.aiMaxHistoryMessages),
     });
 
@@ -101,12 +156,123 @@ export class AssistantService {
       }
     }
 
+    const documentCitations: AssistantDocumentCitation[] = [];
+    const documentsById = new Map(
+      context.documents.map((document) => [document.id, document]),
+    );
+    for (const chunkId of new Set(result.citedChunkIds ?? [])) {
+      for (const [documentId, document] of documentsById) {
+        const chunk = document.chunks.find((candidate) => candidate.id === chunkId);
+        if (!chunk) {
+          continue;
+        }
+        documentCitations.push({
+          id: chunk.id,
+          documentId,
+          title: document.title,
+          pageNumber: chunk.pageNumber,
+          section: chunk.section,
+          excerpt: chunk.text.slice(0, 240),
+        });
+        break;
+      }
+    }
+
     return {
       answer: result.answer,
       provider: this.aiProvider.name,
       citations,
+      documentCitations,
       usedExternalKnowledge: result.usedExternalKnowledge,
       noteCount: context.notes.length,
+      documentCount: context.documents.length,
+    };
+  }
+
+
+  /**
+   * Interprets deterministic performance analysis with the configured AI
+   * provider. AI focus ids are grounded against server-side topic data.
+   */
+  public async analyzePerformance(
+    userId: string,
+    filters: PerformanceFilters = {},
+    now: Date = new Date(),
+  ): Promise<AssistantPerformanceResponse> {
+    await this.aiAccessService.assertAccess(userId);
+    this.rateLimiter.consume(userId);
+
+    const report = await this.performanceAnalysisService.analyze(userId, filters, now);
+    const interpretation = await this.aiProvider.interpretPerformance(
+      this.performanceAnalysisService.buildAIInput(report),
+    );
+
+    const weakTopicsById = new Map(
+      report.analysis.weakTopics.map((topic) => [topic.topicId, topic]),
+    );
+    const focusTopicIds = [
+      ...new Set(
+        interpretation.focusTopicIds.filter((topicId) => weakTopicsById.has(topicId)),
+      ),
+    ].slice(0, 3);
+    const focusTopics: AssistantPerformanceFocus[] = focusTopicIds.map((topicId) => {
+      const topic = weakTopicsById.get(topicId)!;
+      return {
+        topicId,
+        topicName: topic.topicName,
+        accuracy: topic.accuracy,
+        answeredQuestions: topic.answeredQuestions,
+        evidence: topic.evidence,
+      };
+    });
+
+    const seenSuggestions = new Set<string>();
+    const practiceSuggestions: AssistantPerformanceSuggestion[] = [];
+    for (const suggestion of interpretation.practiceSuggestions) {
+      const title = suggestion.title.trim();
+      const reason = suggestion.reason.trim();
+      if (!title || !reason) {
+        continue;
+      }
+      if (suggestion.topicId !== null && !weakTopicsById.has(suggestion.topicId)) {
+        continue;
+      }
+      const dedupeKey = title.toLowerCase();
+      if (seenSuggestions.has(dedupeKey)) {
+        continue;
+      }
+      seenSuggestions.add(dedupeKey);
+      const topic = suggestion.topicId
+        ? weakTopicsById.get(suggestion.topicId)
+        : undefined;
+      practiceSuggestions.push({
+        title,
+        reason,
+        topicId: topic?.topicId ?? null,
+        topicName: topic?.topicName ?? null,
+      });
+      if (practiceSuggestions.length >= 3) {
+        break;
+      }
+    }
+
+    return {
+      provider: this.aiProvider.name,
+      generatedAt: report.analysis.generatedAt,
+      summary: interpretation.summary.trim(),
+      strengths: interpretation.strengths.slice(0, 3),
+      improvementAreas: interpretation.improvementAreas.slice(0, 3),
+      trendInterpretation: interpretation.trendInterpretation.trim(),
+      focusTopics,
+      practiceSuggestions,
+      recommendations: report.recommendations,
+      dataQuality: {
+        reliable: report.analysis.dataQuality.reliable,
+        attemptCount: report.analysis.dataQuality.attemptCount,
+        answeredQuestions: report.analysis.dataQuality.answeredQuestions,
+        insufficientData: report.analysis.dataQuality.insufficientData,
+        limitations: report.analysis.dataQuality.limitations,
+      },
     };
   }
 

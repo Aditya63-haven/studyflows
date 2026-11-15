@@ -251,6 +251,11 @@
   text-decoration: none;
 }
 
+.assistant-citation.document {
+  cursor: help;
+  color: var(--text);
+}
+
 .badge.warning {
   border: 1px solid var(--warn-border);
   background: var(--warn-bg);
