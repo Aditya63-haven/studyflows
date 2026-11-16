@@ -4,6 +4,7 @@ import { IRevisionStrategy } from './domain/interfaces/IRevisionStrategy';
 import { ExternalAIProvider } from './patterns/adapter/ExternalAIProvider';
 import { GeminiAIProvider } from './patterns/adapter/GeminiAIProvider';
 import { MockAIProvider } from './patterns/adapter/MockAIProvider';
+import { OpenAICompatibleAIProvider } from './patterns/adapter/OpenAICompatibleAIProvider';
 import { StudyFacade } from './patterns/facade/StudyFacade';
 import { EventBus } from './patterns/observer/EventBus';
 import { SM2Strategy } from './patterns/strategy/SM2Strategy';
@@ -83,7 +84,7 @@ export interface AppContainer {
 const createRevisionStrategy = (config: Config): IRevisionStrategy =>
   config.revisionStrategy === 'simple' ? new SimpleMemoryStrengthStrategy() : new SM2Strategy();
 
-const createAIProvider = (config: Config): IAIProvider => {
+export const createAIProvider = (config: Config): IAIProvider => {
   if (config.aiProvider === 'gemini') {
     if (!config.aiApiKey) {
       throw new Error('[Config] AI_API_KEY is required when AI_PROVIDER=gemini');
@@ -94,6 +95,25 @@ const createAIProvider = (config: Config): IAIProvider => {
       maxInputChars: config.aiMaxInputChars,
       maxOutputTokens: config.aiMaxOutputTokens,
       timeoutMs: config.aiRequestTimeoutMs,
+    });
+  }
+  if (config.aiProvider === 'openai-compatible') {
+    if (!config.aiApiKey || !config.aiBaseUrl || !config.aiModel) {
+      throw new Error(
+        '[Config] AI_API_KEY, AI_BASE_URL and AI_MODEL are required when AI_PROVIDER=openai-compatible',
+      );
+    }
+    return new OpenAICompatibleAIProvider({
+      apiKey: config.aiApiKey,
+      baseUrl: config.aiBaseUrl,
+      model: config.aiModel,
+      maxInputChars: config.aiMaxInputChars,
+      maxOutputTokens: config.aiMaxOutputTokens,
+      timeoutMs: config.aiRequestTimeoutMs,
+      jsonResponseFormat:
+        config.aiJsonResponseFormat === 'json_object' ? 'json_object' : undefined,
+      reasoningEffort: config.aiReasoningEffort,
+      extraRequestParams: config.aiExtraRequestParams,
     });
   }
   if (config.aiProvider === 'external') {

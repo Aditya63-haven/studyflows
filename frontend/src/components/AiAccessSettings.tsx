@@ -118,7 +118,7 @@ export const AiAccessSettings = () => {
   return (
     <Card
       title="AI access"
-      description="Invite accounts to the Gemini-powered study assistant. Access changes apply immediately."
+      description="Invite accounts to the AI study assistant. Access changes apply immediately."
     >
       <div className="ai-access-settings">
         <ErrorBanner message={error} onDismiss={() => setError(null)} />
@@ -147,7 +147,7 @@ export const AiAccessSettings = () => {
 
         {grants.length === 0 ? (
           <p className="muted small-text">
-            No student invites yet. Add an email above to allow Gemini assistant access.
+            No student invites yet. Add an email above to allow AI assistant access.
           </p>
         ) : (
           <div className="ai-access-list">

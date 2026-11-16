@@ -10,7 +10,7 @@ The project deliberately uses classes, inheritance, interfaces, design patterns 
 - Study spaces for each subject, grouping notes, quizzes and flashcard decks.
 - Markdown notes with AI-assisted condensing and quiz generation.
 - Document library per study space: upload PDF, DOCX, plain text or Markdown files, extract and chunk the text, then cite pages or sections in assistant answers.
-- Invite-only Gemini study assistant grounded in selected notes and documents from a student's own spaces.
+- Invite-only AI study assistant grounded in selected notes and documents from a student's own spaces.
 - Quizzes with MCQ, multi-select and true/false questions, automatic grading and stored attempts.
 - Flashcard decks with flip, shuffle and Again/Hard/Good/Easy review ratings.
 - Spaced-repetition scheduling with due-today, needs-revision and mastered views.
@@ -107,16 +107,46 @@ AVATAR_STORAGE_DIR=storage/avatars
 
 Start MongoDB locally, or point `MONGODB_URI` at a hosted database.
 
-The default `AI_PROVIDER=mock` needs no external services. To enable the real Gemini study assistant, add:
+The default `AI_PROVIDER=mock` needs no external services. To use a real model, choose one of these configurations.
+
+Native Gemini:
 
 ```dotenv
 AI_PROVIDER=gemini
 AI_API_KEY=your-google-ai-api-key
 AI_MODEL=gemini-3.8-flash
-AI_ACCESS_ADMIN_EMAIL=you@university.edu
 ```
 
-Register an account with exactly that admin email. The admin can open **Settings → AI access** and invite other student emails. Invites remain pending until that email registers; revoking access takes effect immediately. Chat, note condensing, quiz generation, assistant planning commands and performance interpretation all require access. Assistant requests are rate limited per user and globally using the limits in `.env.example`.
+Any OpenAI-compatible chat completions API, such as DeepSeek:
+
+```dotenv
+AI_PROVIDER=openai-compatible
+AI_API_KEY=your-deepseek-api-key
+AI_BASE_URL=https://api.deepseek.com
+AI_MODEL=deepseek-flash
+```
+
+OpenAI:
+
+```dotenv
+AI_PROVIDER=openai-compatible
+AI_API_KEY=your-openai-api-key
+AI_BASE_URL=https://api.openai.com/v1
+AI_MODEL=gpt-4.1-mini
+```
+
+Gemini through its OpenAI-compatible endpoint:
+
+```dotenv
+AI_PROVIDER=openai-compatible
+AI_API_KEY=your-google-ai-api-key
+AI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
+AI_MODEL=gemini-3.8-flash
+```
+
+`AI_BASE_URL` is the API base; the app appends `/chat/completions` unless the URL already ends with that path. Optional request tuning is available through `AI_JSON_RESPONSE_FORMAT`, `AI_REASONING_EFFORT` and `AI_EXTRA_REQUEST_PARAMS`. Only enable options supported by your provider. `AI_REQUEST_TIMEOUT_MS` and `AI_MAX_OUTPUT_TOKENS` apply to every provider.
+
+Add `AI_ACCESS_ADMIN_EMAIL=you@university.edu` to manage the invite-only assistant. Register an account with exactly that admin email. The admin can open **Settings → AI access** and invite other student emails. Invites remain pending until that email registers; revoking access takes effect immediately. Chat, note condensing, quiz generation, assistant planning commands and performance interpretation all require access. Assistant requests are rate limited per user and globally using the limits in `.env.example`.
 
 Profile pictures are written to `AVATAR_STORAGE_DIR` (resolved from the backend working directory) and served back through opaque URLs. The directory must be writable by the API and kept on persistent storage. A single local disk is not suitable for multiple backend instances unless the directory is a shared volume; for horizontal deployments, replace `LocalAvatarStorage` with an object-storage implementation of `IAvatarStorage`.
 
@@ -183,10 +213,10 @@ The Jest suite includes:
 
 - Unit tests for every question subtype, mixed quiz grading, the question factory, both revision strategies, the exam-plan builder, error classes, the observer flow and singleton configuration.
 - An API integration test that registers and logs in a user, creates a study space and quiz, submits an attempt and verifies the score.
-- Gemini adapter, AI access, assistant chat and rate-limit tests; the Gemini SDK is mocked and no real API calls are made.
+- Gemini and OpenAI-compatible adapter, AI access, assistant chat and rate-limit tests; external SDKs are mocked and no real API calls are made.
 - Document processing tests for validation, size limits, extraction, chunk page references and empty files, plus API tests for upload, download, ownership, assistant grounding and deletion cleanup.
 - Performance-analysis unit tests for accuracy, trends, weak/strong classification, data-quality limits and recommendation acceptance, plus API tests for the deterministic report, idempotent recommendation acceptance and grounded AI interpretation.
-- Exam-preparation tests for the deterministic scheduler, service preview/approval workflow, mock and Gemini provider contracts and API ownership, fingerprint and shortfall acknowledgement rules.
+- Exam-preparation tests for the deterministic scheduler, service preview/approval workflow, mock, Gemini and OpenAI-compatible provider contracts and API ownership, fingerprint and shortfall acknowledgement rules.
 - `mongodb-memory-server` provides an isolated database for integration tests, so no local test database is required.
 
 Other backend checks:
@@ -326,7 +356,7 @@ Authorization: Bearer <token>
 | GET    | `/attention`                   | Missed sessions and approaching exams with fixes  |
 | POST   | `/attention/:itemId/apply`     | Apply a reschedule suggestion (`next-free-slot` or `weekend`) |
 | POST   | `/assistant/command`           | Interpret a natural-language planning command     |
-| POST   | `/assistant/chat`              | Ask Gemini using selected notes and documents (`documentIds`) |
+| POST   | `/assistant/chat`              | Ask the configured AI provider using selected notes and documents (`documentIds`) |
 | POST   | `/assistant/performance`       | Interpret measured performance with the configured AI provider |
 | POST   | `/assistant/apply`             | Confirm and apply a proposed move of study work    |
 

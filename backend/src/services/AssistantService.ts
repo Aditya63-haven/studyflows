@@ -103,7 +103,7 @@ export interface AssistantChatResponse {
  * Natural-language study assistant.
  *
  * OOP: Adapter (client) - delegates language parsing to the injected
- * IAIProvider, so MockAIProvider and ExternalAIProvider are interchangeable.
+ * IAIProvider, so configured provider implementations are interchangeable.
  * OOP: Facade - combines AI interpretation with the attention reschedule flow.
  */
 export class AssistantService {

@@ -15,7 +15,7 @@ export interface AiAccessGrantProps {
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
- * Administrator-issued invitation for Gemini assistant access.
+ * Administrator-issued invitation for AI assistant access.
  *
  * OOP: Classes and objects - models an invite keyed by normalized email.
  * OOP: Encapsulation - email and revocation state are private and validated.

@@ -480,7 +480,7 @@ export const AssistantPage = () => {
         <div className="stack">
           <Card
             title="Study context"
-            description="Only selected notes and documents from a space you own are sent to Gemini."
+            description="Only selected notes and documents from a space you own are sent to the configured AI provider."
           >
             <div className="stack">
               <label className="field">
@@ -626,9 +626,9 @@ export const AssistantPage = () => {
 
           <Card title="Privacy">
             <p className="muted small-text">
-              Selected notes, document excerpts and your prompts are processed by Google
-              Gemini. On Google's Free tier, submitted data may be used to improve Google
-              products. Do not include sensitive personal information.
+              Selected notes, document excerpts and your prompts are processed by the
+              configured AI provider. Provider terms may allow submitted data to be used to
+              improve their products. Do not include sensitive personal information.
             </p>
             <p className="footnote">
               AI answers can be wrong. Check important details against your source material.
@@ -659,7 +659,7 @@ export const AssistantPage = () => {
                   : 'No study context selected'}
               </p>
             </div>
-            <span className="badge">Gemini</span>
+            <span className="badge">AI assistant</span>
           </header>
 
           <div className="assistant-messages">
