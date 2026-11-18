@@ -1,6 +1,6 @@
 # StudyFlows
 
-StudyFlows is a full-stack study assistant built for an Object-Oriented Programming course project. Students organise subjects into study spaces, write notes, build and take quizzes, review flashcards, schedule revision, create an exam plan and track their progress.
+StudyFlows is a full-stack study assistant built for a Software Engineering course project. Students organise subjects into study spaces, write notes, build and take quizzes, review flashcards, schedule revision, create an exam plan and track their progress.
 
 The project deliberately uses classes, inheritance, interfaces, design patterns and a layered backend so the required OOP concepts can be found directly in the source code.
 
